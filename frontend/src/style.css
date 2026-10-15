@@ -26,8 +26,10 @@ body { margin: 0; min-width: 0; min-height: inherit; font-size: var(--cp-font-si
 .settings-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; padding: 0 0 14px; margin-bottom: 4px; }
 .settings-label { display: flex; align-items: center; gap: 6px; color: var(--cp-color-text-secondary); font-size: 12px; white-space: nowrap; }
 .parameter { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--cp-color-text-secondary); white-space: nowrap; }
-.parameter > div { width: 100px; }
-.parameter.batch > div { width: 78px; }
+.parameter > .parameter-input { width: 80px; flex: 0 0 80px; }
+.parameter.batch > .parameter-input { width: 64px; flex-basis: 64px; }
+.parameter-input input { width: 100%; text-align: center; }
+.parameter-unit { flex-shrink: 0; }
 .parameter-actions { display: flex; align-items: center; gap: 2px; }
 .master-switch { margin-left: auto; display: flex; align-items: center; gap: 10px; white-space: nowrap; font-size: 12px; }
 .settings-help { padding: 10px 14px; max-width: 320px; font-size: 12px; line-height: 1.7; }
@@ -75,5 +77,5 @@ body { margin: 0; min-width: 0; min-height: inherit; font-size: var(--cp-font-si
 .preview { font-size: 11px; color: var(--cp-color-text-quaternary); padding: 8px 0; }
 .spin { animation: spin 1s linear infinite; } @keyframes spin { to { transform: rotate(360deg); } }
 @media (max-width: 1050px) { .metrics { gap: 10px; }.metric { padding: 14px; }.toolbar-actions { margin-left: 0; }.master-switch { margin-left: 0; } }
-@media (max-width: 700px) { .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }.metric { min-height: 100px; padding: 12px; }.metric strong { font-size: 24px; }.metric-icon { width: 30px; height: 30px; }.work-area { padding: 12px; }.account-search { flex: 1 1 100%; width: 100%; }.status-filter, .plan-filter, .order-filter { flex: 1 1 125px; width: 125px; }.toolbar-actions { flex-wrap: wrap; width: 100%; justify-content: flex-end; }.settings-bar { gap: 10px; }.settings-label { flex-basis: 100%; }.parameter { gap: 6px; }.parameter > div { width: 85px; }.parameter.batch > div { width: 68px; }.master-switch { margin-left: auto; } }
+@media (max-width: 700px) { .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }.metric { min-height: 100px; padding: 12px; }.metric strong { font-size: 24px; }.metric-icon { width: 30px; height: 30px; }.work-area { padding: 12px; }.account-search { flex: 1 1 100%; width: 100%; }.status-filter, .plan-filter, .order-filter { flex: 1 1 125px; width: 125px; }.toolbar-actions { flex-wrap: wrap; width: 100%; justify-content: flex-end; }.settings-bar { gap: 10px; }.settings-label { flex-basis: 100%; }.parameter { gap: 6px; }.master-switch { margin-left: auto; } }
 @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
