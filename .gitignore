@@ -1,0 +1,14 @@
+backend/target/
+frontend/node_modules/
+frontend/dist/
+dist/
+/verification/*
+!/verification/frontend-test.mjs
+!/verification/protocol-test.mjs
+!/verification/UPSTREAM-COMPLIANCE.md
+tools/
+frontend/*.log
+.env
+.env.*
+*.pem
+*.key
