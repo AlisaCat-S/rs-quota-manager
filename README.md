@@ -6,13 +6,13 @@
 
 ## 安装与兼容
 
-- 下载：[v0.1.3 安装包与校验文件](https://github.com/Lemon-57/rs-quota-manager/releases/tag/v0.1.3)
+- 下载：[v0.1.4 安装包与校验文件](https://github.com/Lemon-57/rs-quota-manager/releases/tag/v0.1.4)
 - 宿主兼容范围：`>=3.26.2, <3.27.0`，实际安装验证版本为 `3.26.2`。
 - 当前制品：Linux x86_64，glibc 2.28 及以上。尚未发布 ARM64、Windows 或 macOS 安装包。
 - 插件 ID：`personal.quota-manager`。为保留既有安装配置和私有状态，继续沿用该身份。
 - 许可证：Apache-2.0，第三方来源见 [LICENSES/NOTICE.md](LICENSES/NOTICE.md)。
 
-在 RS 的“插件管理 → 安装插件 → GitHub”中填写 `Lemon-57/rs-quota-manager`，版本标签填写 `v0.1.3` 或留空查询稳定版，选择匹配架构的 `.tar.gz` 附件。
+在 RS 的“插件管理 → 安装插件 → GitHub”中填写 `Lemon-57/rs-quota-manager`，版本标签填写 `v0.1.4` 或留空查询稳定版，选择匹配架构的 `.tar.gz` 附件。
 也可从 Release 下载 `.tar.gz` 与 `checksums.txt`，核对 SHA-256 后，通过“上传”安装。不要上传 GitHub 自动生成的 Source code 归档。
 安装时确认来源与插件权限，创建并启用配置，再从侧栏打开“周限与重置卡”。已有安装可通过宿主版本切换更新，保留实例与私有状态。
 

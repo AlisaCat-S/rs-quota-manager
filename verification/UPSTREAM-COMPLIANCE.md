@@ -2,6 +2,8 @@
 
 审查范围：personal.quota-manager 0.1.2 -> 0.1.3。
 
+公开发布 v0.1.4 继续沿用上述修正，并使用公开 ZCard 指标卡与 ZTag 会员标签，配色和样式取自共享组件。
+
 ## 依据
 
 - [RS Issue #278](https://github.com/zyycn/codex-proxy-rs/issues/278)：自定义业务采用插件；UI 库用于组件和主题一致性；plugins 仓库提供可运行示例。不要求把示例集合安装为运行时依赖。
