@@ -1,18 +1,18 @@
 # 周限与重置卡
 
-独立 RS 网关插件，插件 ID 为 `personal.quota-manager`，版本 `0.1.4`
+独立 RS 网关插件，插件 ID 为 `personal.quota-manager`，当前源码版本 `0.1.5`，公开版本以 Releases 为准
 
 基于上游 `v3.26.2` 的公开 SDK，固定提交 `ae5eaa46b447548571e6c46d69bd27d454adb785`，清单和进程协议为 v2，声明 management v1 与 maintenance v1
 
 ## 安装与兼容
 
-- 下载：[v0.1.4 安装包与校验文件](https://github.com/Lemon-57/rs-quota-manager/releases/tag/v0.1.4)
-- 宿主兼容范围：`>=3.26.2, <3.27.0`，实际安装验证版本为 `3.26.2`。
+- 下载：[安装包与校验文件](https://github.com/Lemon-57/rs-quota-manager/releases)
+- 宿主兼容范围：`>=3.26.2, <3.28.0`，已核对 v3.27.1 的账号、额度与卡片接口契约，实际安装验证范围见对应发行说明。
 - 当前制品：Linux x86_64，glibc 2.28 及以上。尚未发布 ARM64、Windows 或 macOS 安装包。
 - 插件 ID：`personal.quota-manager`。为保留既有安装配置和私有状态，继续沿用该身份。
 - 许可证：Apache-2.0，第三方来源见 [LICENSES/NOTICE.md](LICENSES/NOTICE.md)。
 
-在 RS 的“插件管理 → 安装插件 → GitHub”中填写 `Lemon-57/rs-quota-manager`，版本标签填写 `v0.1.4` 或留空查询稳定版，选择匹配架构的 `.tar.gz` 附件。
+在 RS 的“插件管理 → 安装插件 → GitHub”中填写 `Lemon-57/rs-quota-manager`，版本标签留空查询最新稳定版，选择匹配架构的 `.tar.gz` 附件。
 也可从 Release 下载 `.tar.gz` 与 `checksums.txt`，核对 SHA-256 后，通过“上传”安装。不要上传 GitHub 自动生成的 Source code 归档。
 安装时确认来源与插件权限，创建并启用配置，再从侧栏打开“周限与重置卡”。已有安装可通过宿主版本切换更新，保留实例与私有状态。
 
@@ -32,7 +32,7 @@ CSV 包含账号 ID、完整名称和邮箱，若原名称含敏感内容，请�
 
 ## 使用
 
-在网关的插件管理中上传安装 `dist/personal.quota-manager-0.1.4-x86_64-unknown-linux-gnu.tar.gz`，核对旁边的 SHA-256 文件，接受来源并确认配置处于启用状态，再打开“周限与重置卡”页面
+在网关的插件管理中上传安装 `dist/personal.quota-manager-0.1.5-x86_64-unknown-linux-gnu.tar.gz`，核对旁边的 SHA-256 文件，接受来源并确认配置处于启用状态，再打开“周限与重置卡”页面
 
 - 读取 RS 当前账号套餐和启用状态，排除套餐为 Free 的账号，账号列只显示完整邮箱，无邮箱时回退到名称；列表同时显示会员标识、周限、刷新时间、卡张数及到期时间，内部 ID 与账号名称仍参与搜索和导出
 - 按宿主真实 `planType` 判断套餐，名称带 `team+` 的 Free 同样排除，列表、汇总、后台查询和新消费共用该规则
@@ -103,7 +103,7 @@ UI 通过官方 v0.4.1 编译发行包安装，SHA-256 与官方校验文件一�
 测试不访问真实网关或真实上游，不消费真实卡片
 
 `pnpm --dir frontend dev --port 5176` 提供带明确标识的本地模拟预览，发行页面只使用 `window.codexProxyPlugin` 宿主桥，不请求管理员密码或读取管理 Cookie
-安装包声明兼容 `>=3.26.2, <3.27.0`，已在 v3.26.2 宿主验证页面加载和真实账号分页，真实卡片消费未执行
+安装包声明兼容 `>=3.26.2, <3.28.0`，已在 v3.26.2 宿主验证页面加载和真实账号分页，真实卡片消费未执行
 
 ## 页面加载排查
 
