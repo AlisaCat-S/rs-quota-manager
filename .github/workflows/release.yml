@@ -1,0 +1,173 @@
+name: Build and release
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**/*.md', 'docs/**', 'LICENSE', 'LICENSES/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  RUST_VERSION: 1.99.1
+  SDK_REV: 76291f448cdf1d1da2027da32b7c949deb998c7a
+  CARGO_TERM_COLOR: always
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  verify:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 12.14.0
+      - run: node --test .github/scripts/release-version.test.mjs
+      - name: Generate UTC release version
+        id: version
+        run: node .github/scripts/release-version.mjs
+      - name: Install Rust
+        run: |
+          rustup toolchain install "$RUST_VERSION" --profile minimal --component rustfmt,clippy
+          rustup override set "$RUST_VERSION"
+      - name: Verify backend
+        run: |
+          cargo fmt --manifest-path backend/Cargo.toml -- --check
+          cargo clippy --manifest-path backend/Cargo.toml --all-targets --locked -- -D warnings
+          cargo test --manifest-path backend/Cargo.toml --locked
+          cargo build --manifest-path backend/Cargo.toml --locked
+          node verification/protocol-test.mjs
+      - name: Verify frontend
+        run: |
+          pnpm --dir frontend install --frozen-lockfile
+          pnpm --dir frontend build
+          node verification/frontend-test.mjs
+          pnpm --dir frontend exec playwright install --with-deps chromium --only-shell
+          node verification/ui-test.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: web
+          path: frontend/dist/
+          if-no-files-found: error
+
+  package:
+    needs: verify
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64-unknown-linux-gnu, aarch64-unknown-linux-gnu]
+    env:
+      RELEASE_VERSION: ${{ needs.verify.outputs.version }}
+      TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: web
+          path: frontend/dist
+      - name: Install cross-build tools
+        run: |
+          rustup toolchain install "$RUST_VERSION" --profile minimal --target "$TARGET"
+          rustup override set "$RUST_VERSION"
+          python3 -m venv "$RUNNER_TEMP/zig"
+          "$RUNNER_TEMP/zig/bin/pip" install ziglang==0.15.2
+          ln -s "$RUNNER_TEMP/zig/lib/$(ls "$RUNNER_TEMP/zig/lib")/site-packages/ziglang/zig" "$RUNNER_TEMP/zig/bin/zig"
+          echo "$RUNNER_TEMP/zig/bin" >> "$GITHUB_PATH"
+          cargo install cargo-zigbuild --version 0.24.0 --locked
+      - name: Build for glibc 2.28
+        run: |
+          node .github/scripts/release-version.mjs
+          cargo zigbuild --manifest-path backend/Cargo.toml --release --locked --target "$TARGET.2.28"
+      - name: Exercise target binary with mock host
+        run: |
+          binary="$GITHUB_WORKSPACE/backend/target/$TARGET/release/quota-manager"
+          if [[ "$TARGET" == aarch64-* ]]; then
+            sudo apt-get update
+            sudo apt-get install -y qemu-user libc6-arm64-cross
+            printf '#!/bin/bash\nexec qemu-aarch64 -L /usr/aarch64-linux-gnu "%s" "$@"\n' "$binary" > "$RUNNER_TEMP/quota-manager-arm64"
+            chmod +x "$RUNNER_TEMP/quota-manager-arm64"
+            binary="$RUNNER_TEMP/quota-manager-arm64"
+          fi
+          node verification/protocol-test.mjs "$binary"
+      - name: Build official packager from pinned SDK source
+        run: |
+          git init "$RUNNER_TEMP/sdk"
+          git -C "$RUNNER_TEMP/sdk" remote add origin https://github.com/zyycn/codex-proxy-rs.git
+          git -C "$RUNNER_TEMP/sdk" fetch --depth 1 origin "$SDK_REV"
+          git -C "$RUNNER_TEMP/sdk" checkout --detach FETCH_HEAD
+          cargo install --locked --path "$RUNNER_TEMP/sdk/backend/apps/plugin-cli" --root "$RUNNER_TEMP/packager"
+      - name: Package plugin
+        run: |
+          "$RUNNER_TEMP/packager/bin/cpr-plugin" package \
+            --manifest plugin.json \
+            --binary "backend/target/$TARGET/release/quota-manager" \
+            --target "$TARGET" \
+            --resource-map web=frontend/dist --resource-map legal=LICENSES \
+            --output-dir dist
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: package-${{ matrix.target }}
+          path: dist/
+          if-no-files-found: error
+
+  release:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: [verify, package]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ needs.verify.outputs.tag }}
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: package-*
+          path: dist
+          merge-multiple: true
+      - name: Check complete release and publish
+        run: |
+          cd dist
+          test "$(find . -maxdepth 1 -name '*.tar.gz' | wc -l)" -eq 2
+          cat *.tar.gz.sha256 > checksums.txt
+          sha256sum --check checksums.txt
+          cat > release-notes.md <<'EOF'
+          Linux x86_64 与 ARM64（aarch64）安装包，glibc >= 2.28。
+          宿主兼容范围：>=3.30.2, <3.31.0；旧宿主请使用匹配版本，不能直接安装本次 RPC v5 制品。
+          根据宿主架构选择 .tar.gz，在插件管理中安装；不要上传 Source code 归档。
+          安装前使用 checksums.txt 或同名 .sha256 文件校验 SHA-256。
+          自动使用默认关闭；真实重置卡消费无法撤回。验证仅使用模拟宿主和模拟数据。
+          EOF
+          printf '\n源码提交：%s\n构建记录：https://github.com/%s/actions/runs/%s\n' "$GITHUB_SHA" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" >> release-notes.md
+          # Create a draft first: incomplete uploads must not become the latest release.
+          gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" --draft --notes-file release-notes.md
+          gh release upload "$TAG" *.tar.gz *.tar.gz.sha256 checksums.txt
+          gh release edit "$TAG" --draft=false --latest
