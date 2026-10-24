@@ -4,6 +4,7 @@ frontend/dist/
 dist/
 /verification/*
 !/verification/frontend-test.mjs
+!/verification/ui-test.mjs
 !/verification/protocol-test.mjs
 !/verification/UPSTREAM-COMPLIANCE.md
 tools/

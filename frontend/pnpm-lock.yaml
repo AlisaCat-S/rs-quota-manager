@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@codex-proxy/ui':
-        specifier: https://github.com/zyycn/codex-proxy-ui/releases/download/v0.4.1/codex-proxy-ui-0.4.1.tgz
-        version: https://github.com/zyycn/codex-proxy-ui/releases/download/v0.4.1/codex-proxy-ui-0.4.1.tgz(vite@8.3.0(@types/node@26.5.1)(jiti@2.7.0))(vue@3.5.42(typescript@6.0.3))
+        specifier: https://github.com/zyycn/codex-proxy-ui/releases/download/v0.6.0/codex-proxy-ui-0.6.0.tgz
+        version: https://github.com/zyycn/codex-proxy-ui/releases/download/v0.6.0/codex-proxy-ui-0.6.0.tgz(vite@8.3.0(@types/node@26.5.1)(jiti@2.7.0))(vue@3.5.42(typescript@6.0.3))
       '@lucide/vue':
         specifier: 1.47.0
         version: 1.47.0(vue@3.5.42(typescript@6.0.3))
@@ -27,6 +27,9 @@ importers:
       '@vitejs/plugin-vue':
         specifier: 6.0.8
         version: 6.0.8(vite@8.3.0(@types/node@26.5.1)(jiti@2.7.0))(vue@3.5.42(typescript@6.0.3))
+      playwright:
+        specifier: 1.62.1
+        version: 1.62.1
       tailwindcss:
         specifier: 4.3.3
         version: 4.3.3
@@ -66,9 +69,9 @@ packages:
     resolution: {integrity: sha512-Vj1jF3cPfxg7OAfoI7QnVKLoILlm2JF9pnVHrX8qx7AHMiYWT+NDAA7jChlNgRS4WTLc/fD1lXLmPixluj+3Gg==}
     engines: {node: '>=6.9.0'}
 
-  '@codex-proxy/ui@https://github.com/zyycn/codex-proxy-ui/releases/download/v0.4.1/codex-proxy-ui-0.4.1.tgz':
-    resolution: {integrity: sha256-LhGcxQSmGt8qPdYsOSK0F2LSMHf+s1TchQiFRZ3/6ZM=, tarball: https://github.com/zyycn/codex-proxy-ui/releases/download/v0.4.1/codex-proxy-ui-0.4.1.tgz}
-    version: 0.4.1
+  '@codex-proxy/ui@https://github.com/zyycn/codex-proxy-ui/releases/download/v0.6.0/codex-proxy-ui-0.6.0.tgz':
+    resolution: {integrity: sha512-dGZDnpLAh2RtAD9lEEv1gCQiBXgiNuR8qdmGXmfi/PNFTAER6dw/XfQnV5DC0MPrZs3PiULvtMoUS+S5v0nHDg==, tarball: https://github.com/zyycn/codex-proxy-ui/releases/download/v0.6.0/codex-proxy-ui-0.6.0.tgz}
+    version: 0.6.0
     engines: {node: '>=24'}
     peerDependencies:
       vite: ^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0
@@ -422,6 +425,9 @@ packages:
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
 
+  dayjs@1.11.23:
+    resolution: {integrity: sha512-QDTCU0M0MxR3hQfnlDJfwekQiaanm1ubOD231u73WBckQ/fsamwRLiE2GBz6D3a/xF1NgfiDLJjXBa1hYOYTtQ==}
+
   detect-libc@2.1.2:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
@@ -451,6 +457,11 @@ packages:
     peerDependenciesMeta:
       picomatch:
         optional: true
+
+  fsevents@2.3.2:
+    resolution: {integrity: sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==}
+    engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
+    os: [darwin]
 
   fsevents@2.3.3:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
@@ -641,6 +652,16 @@ packages:
     resolution: {integrity: sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA==}
     engines: {node: '>=12'}
 
+  playwright-core@1.62.1:
+    resolution: {integrity: sha512-wPYSwEBJY9GHraISXqyqtx0na0LpO3XEX7jNDhntbex7tzUS7kLnZsOlFruFJB4Hi/rhDMjXGqHewDZ68nYZVw==}
+    engines: {node: '>=20'}
+    hasBin: true
+
+  playwright@1.62.1:
+    resolution: {integrity: sha512-0M+L3LAD8/nm554LOla9Ayx0j0tmFZ0FBcoQ7F1VuVHpM/XpiC8RcDzBQB8W5+hA8L22THxELzeF+2WcUzvcLg==}
+    engines: {node: '>=20'}
+    hasBin: true
+
   postcss@8.5.30:
     resolution: {integrity: sha512-zkd+e9S1AQHhmaBKye9zlFHWjOwVgqXl1q3ECYy8561K7qxR2cREf/STLskulBFd78k6AOFeA+ff1TtEzk9bAA==}
     engines: {node: ^10 || ^12 || >=14}
@@ -757,13 +778,14 @@ snapshots:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
 
-  '@codex-proxy/ui@https://github.com/zyycn/codex-proxy-ui/releases/download/v0.4.1/codex-proxy-ui-0.4.1.tgz(vite@8.3.0(@types/node@26.5.1)(jiti@2.7.0))(vue@3.5.42(typescript@6.0.3))':
+  '@codex-proxy/ui@https://github.com/zyycn/codex-proxy-ui/releases/download/v0.6.0/codex-proxy-ui-0.6.0.tgz(vite@8.3.0(@types/node@26.5.1)(jiti@2.7.0))(vue@3.5.42(typescript@6.0.3))':
     dependencies:
       '@ant-design/colors': 8.0.1
       '@ant-design/fast-color': 3.0.1
       '@lucide/vue': 1.57.0(vue@3.5.42(typescript@6.0.3))
       '@vueuse/core': 15.0.0(vue@3.5.42(typescript@6.0.3))
       '@vueuse/integrations': 15.0.0(sortablejs@1.15.7)(vue@3.5.42(typescript@6.0.3))
+      dayjs: 1.11.23
       dompurify: 3.4.17
       es-toolkit: 1.52.0
       gsap: 3.15.0
@@ -1057,6 +1079,8 @@ snapshots:
 
   csstype@3.2.3: {}
 
+  dayjs@1.11.23: {}
+
   detect-libc@2.1.2: {}
 
   dompurify@3.4.17:
@@ -1077,6 +1101,9 @@ snapshots:
   fdir@6.5.0(picomatch@4.0.7):
     optionalDependencies:
       picomatch: 4.0.7
+
+  fsevents@2.3.2:
+    optional: true
 
   fsevents@2.3.3:
     optional: true
@@ -1200,6 +1227,14 @@ snapshots:
   picocolors@1.1.1: {}
 
   picomatch@4.0.7: {}
+
+  playwright-core@1.62.1: {}
+
+  playwright@1.62.1:
+    dependencies:
+      playwright-core: 1.62.1
+    optionalDependencies:
+      fsevents: 2.3.2
 
   postcss@8.5.30:
     dependencies:
