@@ -9,6 +9,12 @@ const accounts = [account('acct_001'), account('acct_002', false), account('acct
 accounts[7].name = 'free-prefix-but-paid-plus@example.com'
 const quota = (id, used = 25, key = 'codex:604800s', seconds = 604800) => ({ schema_version: 1, account_id: id, observed_at_ms: Date.now(), windows: [{ key, window_seconds: seconds, used_percent: used, reset_at_ms: stamp + 86400000 }] })
 const quotas = new Map(accounts.map(a => [a.account_id, quota(a.account_id)]))
+const forecast = id => ({ accountId: id, generatedAt: new Date().toISOString(), forecasts: [
+  { period: 'weekly', targetDays: 7, extrapolated: false, unavailableReason: null, lowSample: false, incompleteCost: false, estimatedUsd: 37.5, estimatedUsdDisplay: '$37.50' },
+  { period: 'monthly', targetDays: 30, extrapolated: true, unavailableReason: null, lowSample: false, incompleteCost: false, estimatedUsd: 150, estimatedUsdDisplay: '$150.00' },
+] })
+const forecasts = new Map(accounts.map(a => [a.account_id, forecast(a.account_id)])), forecastQueries = []
+let forecastMode = 'normal'
 const cards = new Map(accounts.map(a => [a.account_id, { availableCount: 2, credits: [
   { id: `${a.account_id}_late`, status: 'available', title: 'Full reset (Weekly + 5 hr)', resetType: 'full', expiresAt: new Date(stamp + 86400000 * 7).toISOString(), expiresAtDisplay: null },
   { id: `${a.account_id}_early`, status: 'available', title: 'Full reset (Weekly + 5 hr)', resetType: 'full', expiresAt: new Date(stamp + 86400000 * 2).toISOString(), expiresAtDisplay: null },
@@ -77,9 +83,21 @@ async function callback(meta, payload) {
   }
   if (meta.method === 'host.http.dispatch') {
     const url = new URL(meta.params.uri, 'http://mock.invalid'), id = url.searchParams.get('accountId') || data.accountId
-    assert.equal(url.pathname, '/api/admin/accounts/reset-credits')
+    assert.ok(['/api/admin/accounts/reset-credits', '/api/admin/accounts/quota-forecast'].includes(url.pathname))
     let envelope, status = 200
-    if (meta.params.method === 'GET') { cardQueries++; envelope = { code: 200, message: 'ok', data: cards.get(id) }; if (activeMode === 'downgraded') accounts.find(a=>a.account_id===id).plan = 'free'; if (activeMode === 'automation_off') { records.get('settings').value.automatic = false; records.get('settings').version++ } }
+    if (url.pathname === '/api/admin/accounts/quota-forecast') {
+      assert.equal(meta.params.method, 'GET')
+      assert.deepEqual([...url.searchParams.keys()], ['accountId'], 'Local forecast must not request an upstream refresh')
+      assert.equal(meta.params.body.kind, 'empty')
+      forecastQueries.push(id)
+      if (id === 'acct_001' && forecastMode === 'failed') return error(meta.id)
+      const report = structuredClone(forecasts.get(id))
+      for (const item of report.forecasts) Object.assign(item, { estimatedTokens: 2500000, estimatedTokensDisplay: '2.50M', incompleteTokens: false })
+      if (id === 'acct_001' && forecastMode === 'mismatch') report.accountId = 'another-account'
+      if (id === 'acct_001' && forecastMode === 'invalid') report.forecasts[0].estimatedUsdDisplay = 37.5
+      envelope = { code: 200, message: 'ok', data: report }
+    }
+    else if (meta.params.method === 'GET') { cardQueries++; envelope = { code: 200, message: 'ok', data: cards.get(id) }; if (activeMode === 'downgraded') accounts.find(a=>a.account_id===id).plan = 'free'; if (activeMode === 'automation_off') { records.get('settings').value.automatic = false; records.get('settings').version++ } }
     else {
       assert.equal(meta.params.method, 'POST')
       const state = records.get(`account/${id}`).value
@@ -190,10 +208,33 @@ try {
   assert.equal(page.value.accounts[0].account.plan_type, 'team'); assert.equal(page.value.accounts[1].account.enabled, false)
   assert.ok(page.value.accounts.every(row=>!row.state.automatic))
   check('Pagination includes complete account ID and name')
+  assert.deepEqual(page.value.accounts[0].forecast, forecasts.get('acct_001'))
+  assert.equal(page.value.accounts[0].forecastError, null)
+  assert.equal(refreshCalls.length, 0); assert.equal(cardQueries, 0); assert.equal(posts.length, 0)
+  check('Account snapshots read current local host forecasts without refreshing quota or cards')
+  for (const mode of ['failed', 'mismatch', 'invalid']) {
+    forecastMode = mode
+    const partial = await request('api/accounts')
+    assert.equal(partial.status, 200); assert.equal(partial.value.accounts.length, 2)
+    assert.equal(partial.value.accounts[0].forecast, null)
+    assert.equal(partial.value.accounts[0].forecastError, mode === 'failed' ? '预估查询失败' : '预估响应无效')
+    assert.equal(partial.value.accounts[0].state.error, null)
+    assert.deepEqual(partial.value.accounts[1].forecast, forecasts.get('acct_002'))
+  }
+  forecastMode = 'normal'
+  check('Unavailable, malformed and wrong-account forecasts cannot hide accounts or affect automation state')
+  forecasts.get('acct_001').forecasts[0].estimatedUsd = 0
+  forecasts.get('acct_001').forecasts[0].estimatedUsdDisplay = '$0.00'
+  const refreshedForecast = await request('api/refresh', { accountId: 'acct_001' })
+  assert.equal(refreshedForecast.status, 200)
+  assert.equal(refreshedForecast.value.forecast.forecasts[0].estimatedUsd, 0)
+  assert.equal(refreshedForecast.value.forecastError, null)
+  check('Manual refresh returns the latest host forecast and preserves zero estimates')
   const freePage = await request('api/accounts', undefined, 'cursor=acct_006'); assert.equal(freePage.value.accounts.length, 1); assert.equal(freePage.value.accounts[0].account.account_id, 'acct_008')
   const mixedPage = await request('api/accounts', undefined, 'cursor=acct_005'); assert.equal(mixedPage.value.accounts.length, 0); assert.equal(mixedPage.value.nextCursor, 'acct_007')
   const paidAfterFree = await request('api/accounts', undefined, 'cursor='+mixedPage.value.nextCursor); assert.equal(paidAfterFree.value.accounts[0].account.plan_type, 'plus')
   check('RS plan type excludes Free despite team-like names and preserves empty-page pagination')
+  assert.ok(!forecastQueries.some(id => id === 'acct_006' || id === 'acct_007'))
   const beforeFreeQueries = cardQueries, beforeFreePosts = posts.length
   for (const path of ['api/consume','api/refresh','api/policy']) { const blocked=await request(path,{accountId:'acct_006',creditId:'acct_006_early',automatic:true}); assert.equal(blocked.status,400) }
   assert.equal(posts.length,beforeFreePosts); assert.equal(cardQueries,beforeFreeQueries)
@@ -244,6 +285,7 @@ try {
   check('Downgraded Free leaves the active list but retains an unresolved original request')
   await stop(); await start(); consumeMode = 'already_redeemed'
   const retry = await request('api/retry', { accountId: 'acct_004', requestId: original }); assert.equal(retry.status, 200); assert.equal(posts.at(-1).redeemRequestId, original); assert.equal(retry.value.state.pending, null); assert.equal(retry.value.state.history[0].code, 'already_redeemed')
+  assert.deepEqual(retry.value.forecast, forecasts.get('acct_004'))
   check('Process restart retry reuses the durable original UUID')
   assert.equal(accounts[3].plan,'free');check('An existing uncertain operation can be confirmed after plan downgrade')
   consumeMode = 'invalid'; const invalid = await request('api/consume', { accountId: 'acct_005', creditId: 'acct_005_early' }); assert.ok(invalid.value.state.pending)

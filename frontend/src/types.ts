@@ -3,6 +3,13 @@ export interface SettingsResult { value: Settings; version: number | null; scan?
 export interface Card { id: string; status: string | null; title: string | null; expiresAt: string | null; expiresAtDisplay: string | null; resetType: string | null }
 export interface QuotaWindow { key: string; window_seconds: number | null; used_percent: number | null; reset_at_ms: number | null }
 export interface Quota { account_id: string; observed_at_ms: number | null; windows: QuotaWindow[] }
+export interface Forecast {
+  period: string; targetDays: number; extrapolated: boolean; unavailableReason: string | null;
+  lowSample: boolean; incompleteCost: boolean;
+  estimatedUsd: number | null; estimatedUsdDisplay: string;
+}
+export interface ForecastReport { accountId: string; generatedAt: string; forecasts: Forecast[] }
+export interface ForecastResult { forecast: ForecastReport | null; forecastError: string | null }
 export interface Pending { requestId: string; creditId: string | null; startedAtMs: number; automatic: boolean }
 export interface Event { atMs: number; requestId: string; creditId: string | null; automatic: boolean; code: string }
 export interface State {
@@ -10,7 +17,7 @@ export interface State {
   cardsObservedAtMs: number | null; cardsCheckedAtMs: number | null; error: string | null;
   pending: Pending | null; awaitingRecovery: boolean; lastAttemptAtMs: number | null; history: Event[];
 }
-export interface Row {
+export interface Row extends ForecastResult {
   account: { account_id: string; provider_id: string; name: string; email: string | null; enabled: boolean; authentication_kind: string; plan_type: string | null };
   quota: Quota | null; state: State;
 }

@@ -1,4 +1,4 @@
-import type { Card, Event, Page, Pending, Quota, Row, SettingsResult, State } from '../../types'
+import type { Card, Event, ForecastReport, ForecastResult, Page, Pending, Quota, Row, SettingsResult, State } from '../../types'
 import { array, boolean, nonNegativeInteger as integer, nullable, number, record, string } from '../validation'
 
 export function parseSettings(input: unknown): SettingsResult {
@@ -39,20 +39,34 @@ function parseQuota(input: unknown): Quota {
     return { key: string(w.key, '窗口标识'), window_seconds: nullable(w.window_seconds, integer, '窗口时长'), used_percent: nullable(w.used_percent, number, '用量比例'), reset_at_ms: nullable(w.reset_at_ms, integer, '额度刷新时间') }
   }, '额度窗口') }
 }
+function parseForecast(input: unknown): ForecastReport {
+  const v = record(input, '容量预估')
+  return { accountId: string(v.accountId, '预估账号'), generatedAt: string(v.generatedAt, '预估时间'), forecasts: array(v.forecasts, input => {
+    const f = record(input, '周期预估')
+    return {
+      period: string(f.period, '预估周期'), targetDays: number(f.targetDays, '预估天数'), extrapolated: boolean(f.extrapolated, '周期折算'),
+      unavailableReason: nullable(f.unavailableReason, string, '预估不可用原因'), lowSample: boolean(f.lowSample, '初步预估'), incompleteCost: boolean(f.incompleteCost, '费用记录不完整'),
+      estimatedUsd: nullable(f.estimatedUsd, number, '预估美元'), estimatedUsdDisplay: string(f.estimatedUsdDisplay, '预估美元显示'),
+    }
+  }, '周期预估') }
+}
+function parseForecastResult(v: Record<string, unknown>): ForecastResult {
+  return { forecast: nullable(v.forecast, parseForecast, '容量预估'), forecastError: nullable(v.forecastError, string, '预估查询错误') }
+}
 function parseRow(input: unknown): Row {
   const v = record(input, '账号'), a = record(v.account, '账号信息')
   return {
     account: { account_id: string(a.account_id, '账号标识'), provider_id: string(a.provider_id, '提供方'), name: string(a.name, '账号名称'), email: nullable(a.email, string, '账号邮箱'), enabled: boolean(a.enabled, '启用状态'), authentication_kind: string(a.authentication_kind, '认证类型'), plan_type: nullable(a.plan_type, string, '会员标识') },
-    quota: nullable(v.quota, parseQuota, '额度'), state: parseState(v.state),
+    quota: nullable(v.quota, parseQuota, '额度'), state: parseState(v.state), ...parseForecastResult(v),
   }
 }
 export function parsePage(input: unknown): Page {
   const v = record(input, '账号分页')
   return { accounts: array(v.accounts, parseRow, '账号列表'), excludedPending: array(v.excludedPending, parseRow, '已排除未决账号'), nextCursor: nullable(v.nextCursor, string, '分页游标'), generatedAtMs: integer(v.generatedAtMs, '快照时间') }
 }
-export function parseUpdate(input: unknown): { state: State; quota: Quota | null } {
+export function parseUpdate(input: unknown): { state: State; quota: Quota | null } & ForecastResult {
   const v = record(input, '更新结果')
-  return { state: parseState(v.state), quota: nullable(v.quota, parseQuota, '额度') }
+  return { state: parseState(v.state), quota: nullable(v.quota, parseQuota, '额度'), ...parseForecastResult(v) }
 }
 export function parsePolicy(input: unknown): SettingsResult & { state: State } {
   return { ...parseSettings(input), state: parseState(record(input, '账号策略').state) }

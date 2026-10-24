@@ -11,6 +11,8 @@ export function installPreview() {
   const rows: Row[] = Array.from({ length: 43 }, (_, i) => ({
     account: { account_id: `acct_preview_${String(i + 1).padStart(3, '0')}`, provider_id: i === 42 ? 'xai' : 'openai', name: `team+sample${i + 1}@example.com+2026/10/28+workspace3+region-a`, email: `sample${i + 1}@example.com`, enabled: i !== 7, authentication_kind: i === 42 ? 'api_key' : 'oauth', plan_type: i === 0 || i === 5 || i === 40 ? 'free' : i === 41 ? 'plus' : i === 10 ? 'pro' : 'team' },
     quota: i === 42 ? null : { account_id: `acct_preview_${String(i + 1).padStart(3, '0')}`, observed_at_ms: stamp - 40000, windows: [{ key: 'codex:604800s', window_seconds: 604800, used_percent: i % 7 === 0 ? 100 : (i * 13 + 22) % 98, reset_at_ms: stamp + (i + 1) * 7200000 }] },
+    forecast: i === 42 ? null : { accountId: `acct_preview_${String(i + 1).padStart(3, '0')}`, generatedAt: new Date(stamp).toISOString(), forecasts: [{ period: 'weekly', targetDays: 7, extrapolated: false, unavailableReason: i === 41 ? '有效额度进度不足 5 个百分点，请继续积累用量。' : null, lowSample: i === 2, incompleteCost: i === 3, estimatedUsd: i === 41 ? null : (i + 1) * 12.5, estimatedUsdDisplay: i === 41 ? '—' : `$${((i + 1) * 12.5).toFixed(2)}` }] },
+    forecastError: i === 42 ? '预估查询失败' : null,
     state: { ...state(), cards: i === 41 ? null : { availableCount: i % 3, credits: Array.from({ length: i % 3 }, (_, n) => ({ id: `card_${i}_${n}`, status: 'available', title: 'Full reset (Weekly + 5 hr)', expiresAt: new Date(stamp + (n + 1) * 86400000 * 6).toISOString(), expiresAtDisplay: null, resetType: 'full' })) } },
   }))
   rows[2]!.state.pending = { requestId: 'c85eac15-2fde-4d55-92bd-f328f272f40b', creditId: 'card_2_0', startedAtMs: stamp - 20000, automatic: false }
@@ -55,7 +57,7 @@ export function installPreview() {
         row.quota!.windows[0]!.used_percent = 0
         row.state.history.unshift({ atMs: Date.now(), creditId: data.creditId ?? null, requestId: data.requestId ?? 'preview-operation', automatic: false, code: 'reset' })
       }
-      return encode({ state: view(row).state, quota: row.quota })
+      return encode({ state: view(row).state, quota: row.quota, forecast: row.forecast, forecastError: row.forecastError })
     },
   }
 }

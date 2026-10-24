@@ -16,6 +16,7 @@ import { ZRadio } from '@codex-proxy/ui/radio'
 import { ZSwitch } from '@codex-proxy/ui/switch'
 import { ZTable, type TableColumn } from '@codex-proxy/ui/table'
 import PlanBadge from './PlanBadge.vue'
+import ForecastCell from './ForecastCell.vue'
 import ExportDialog from './ExportDialog.vue'
 import { ref } from 'vue'
 import { avatarTone, canReset, csv, isAutomaticEligible, isLimited, selectable, status, time, week, weeks } from './format'
@@ -37,6 +38,7 @@ const columns: TableColumn<Row>[] = [
   { key: 'plan', label: '订阅', kind: 'status', width: 95, align: 'center' },
   { key: 'status', label: '状态', kind: 'status', width: 120 },
   { key: 'weekly', label: '周限', kind: 'custom', width: 120 },
+  { key: 'forecast', label: '周预估金额', kind: 'custom', width: 140 },
   { key: 'reset', label: '周限刷新时间', kind: 'datetime', width: 175 },
   { key: 'cards', label: '重置卡 / 到期时间', kind: 'custom', minWidth: 220 },
   { key: 'automatic', label: '自动', kind: 'custom', width: 80, align: 'center' },
@@ -94,6 +96,7 @@ const statusTone = (row: Row) => row.state.pending || isLimited(row) ? 'warning'
         <template #plan="{ row }"><PlanBadge :plan="row.account.plan_type" /></template>
         <template #status="{ row }"><span class="account-status" :class="`status-${statusTone(row)}`" :title="row.state.error || status(row)"><i></i>{{ status(row) }}</span></template>
         <template #weekly="{ row }"><div v-if="week(row)" class="weekly-cell" :title="`额度观测 ${time(row.quota?.observed_at_ms)}`"><div class="quota-value" :class="{ warning: isLimited(row) }">{{ week(row)?.used_percent == null ? '未知' : `${week(row)!.used_percent!.toFixed(1)}%` }}<span>已用</span></div><div class="quota-track"><i :class="{ exhausted: isLimited(row) }" :style="{ width: `${Math.min(100, Math.max(0, week(row)?.used_percent || 0))}%` }"></i></div><details v-if="weeks(row).length > 1" class="extra"><summary>其他周限</summary><span v-for="window in weeks(row)" :key="window.key">{{ window.key }} · {{ window.used_percent ?? '未知' }}%</span></details></div><span v-else class="muted">无周限数据</span></template>
+        <template #forecast="{ row }"><ForecastCell :row="row" /></template>
         <template #reset="{ row }"><span class="date" :title="`额度观测 ${time(row.quota?.observed_at_ms)}`">{{ time(week(row)?.reset_at_ms) }}</span></template>
         <template #cards="{ row }"><div class="credits-cell" :title="`卡片观测 ${time(row.state.cardsObservedAtMs)}`"><span class="credit-count" :class="{ muted: !row.state.cards || !row.state.cards.availableCount }"><TicketCheck :size="14" />{{ row.state.cards ? `${row.state.cards.availableCount} 张` : '未查询' }}</span><span v-for="card in selectable(row)" :key="card.id" class="expiry" :title="card.title || '用量重置'">{{ time(card.expiresAt) }}</span><span v-if="row.state.cards && row.state.cards.availableCount > 0 && !selectable(row).length" class="sub">到期信息待更新</span></div></template>
         <template #automatic="{ row }"><ZSwitch :model-value="settings.value.automatic && row.state.automatic" :disabled="blocked || !isAutomaticEligible(row)" :aria-label="`自动使用 ${row.account.name}`" :title="!row.account.enabled ? '账号已停用' : '自动使用重置卡'" @change="policy(row, $event)" /></template>

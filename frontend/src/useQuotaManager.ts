@@ -61,9 +61,10 @@ export function useQuotaManager() {
   }
   function resetDraft() { acceptSettings(settings.value, true) }
   function clearFilters() { search.value = ''; filter.value = 'all'; membership.value = 'all' }
-  function applyRow(row: Row, result: { state: Row['state']; quota?: Row['quota'] }) {
+  function applyRow(row: Row, result: { state: Row['state'] } & Partial<Pick<Row, 'quota' | 'forecast' | 'forecastError'>>) {
     row.state = result.state
     if ('quota' in result) row.quota = result.quota ?? null
+    if ('forecast' in result) { row.forecast = result.forecast ?? null; row.forecastError = result.forecastError ?? null }
     row.state.automatic = settings.value.value.automatic && row.state.automatic && isAutomaticEligible(row)
   }
   async function load(silent = false) {

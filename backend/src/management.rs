@@ -2,7 +2,7 @@
 
 use crate::{
     automation::{self, Selection},
-    engine,
+    engine, forecast,
     host::{fault, load, now, save},
     model::*,
 };
@@ -115,7 +115,7 @@ async fn handle_inner(call: TypedCall<ManagementRequest>) -> Result<Value, Plugi
                 if is_free(account.plan_type.as_deref()) {
                     if state.pending.is_some() {
                         excluded_pending
-                            .push(json!({"account":account_view,"quota":null,"state":state}));
+                            .push(json!({"account":account_view,"quota":null,"state":state,"forecast":null,"forecastError":null}));
                     }
                     continue;
                 }
@@ -125,7 +125,8 @@ async fn handle_inner(call: TypedCall<ManagementRequest>) -> Result<Value, Plugi
                     })
                     .await
                     .ok();
-                rows.push(json!({"account":account_view,"quota":quota,"state":state}));
+                let (forecast, forecast_error) = forecast::read(host, &account.account_id).await;
+                rows.push(json!({"account":account_view,"quota":quota,"state":state,"forecast":forecast,"forecastError":forecast_error}));
             }
             return Ok(
                 json!({"accounts":rows,"excludedPending":excluded_pending,"nextCursor":page.next_cursor,"generatedAtMs":now()}),
@@ -217,7 +218,10 @@ async fn handle_inner(call: TypedCall<ManagementRequest>) -> Result<Value, Plugi
             let (settings, _) = load::<Settings>(host, "settings").await?;
             let (selection, _) = load::<Selection>(host, "automation").await?;
             state.automatic = automation::enabled(&settings, &selection, &account, &state);
-            Ok(json!({"state":state,"quota":quota}))
+            let (forecast, forecast_error) = forecast::read(host, id).await;
+            Ok(
+                json!({"state":state,"quota":quota,"forecast":forecast,"forecastError":forecast_error}),
+            )
         }
         "api/consume" | "api/retry" => {
             if call.request.path == "api/retry" && request.request_id.is_none() {
@@ -244,7 +248,10 @@ async fn handle_inner(call: TypedCall<ManagementRequest>) -> Result<Value, Plugi
                 })
                 .await
                 .ok();
-            Ok(json!({"state":state,"quota":quota}))
+            let (forecast, forecast_error) = forecast::read(host, id).await;
+            Ok(
+                json!({"state":state,"quota":quota,"forecast":forecast,"forecastError":forecast_error}),
+            )
         }
         _ => Err(fault("路由不存在")),
     }

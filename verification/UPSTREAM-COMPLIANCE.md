@@ -4,6 +4,14 @@
 
 SDK 已对齐 RS v3.30.2，进程协议升级为 v5、management 升级为 v2，清单与页面桥保持 v2。UI 升级至 v0.6.0，并通过公开 `ZConfigProvider` / `zhHans` 保留中文控件。差异分析、原生自动重置冲突处理和验证证据见 [SDK 适配记录](../docs/SDK-UPGRADE-v0.2.0.md)。
 
+### 周预估金额
+
+管理页通过现有 `host.http.dispatch` 调用宿主相对路径 `GET /api/admin/accounts/quota-forecast?accountId=…`。RS v3.30.2 的 [查询实现](https://github.com/zyycn/codex-proxy-rs/blob/v3.30.2/backend/crates/gateway-admin/src/use_case/accounts/mod.rs) 使用 `refresh: false` 的额度观测和本地配对用量历史；[响应契约](https://github.com/zyycn/codex-proxy-rs/blob/v3.30.2/backend/crates/gateway-api/src/admin/accounts/wire.rs) 提供周/月预估。插件展示 `period: weekly` 的 `estimatedUsdDisplay`，保留金额原值用于导出，不自行按 Token 数或周期比例换算。页面与导出只展示周预估金额。
+
+预估随账号快照读取、手动更新和消费结果回读更新，不写入插件私有状态。单个账号查询失败或响应账号不匹配时单独提示，保留账号列表、额度和卡片操作；无金额时显示“暂无预估”，零金额正常显示。预估不参与自动消费判断，SDK、宿主兼容范围和状态 schema 均不变。
+
+2026-10-24 本地验证通过：Rustfmt、严格 Clippy、3 项 Rust 测试、34 项模拟宿主协议场景、12 项前端契约用例、9 项浏览器回归及生产构建。覆盖列顺序、金额实时更新、零值、只有 Token 而没有金额、预估失败、CSV、深浅主题和窄屏；截图见 `docs/screenshots/overview.png` 与 `verification/ui-artifacts/`。未进行真实宿主安装、线上切换或真实卡片消费。本次为新增展示功能，发布与网站更新需单独安排。
+
 ## 历史审查 v0.1.3–v0.1.4
 
 审查范围：personal.quota-manager 0.1.2 -> 0.1.3。

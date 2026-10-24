@@ -29,6 +29,14 @@ try {
   assert.equal(await page.getByRole('button', { name: '上一页', exact: true }).isDisabled(), true)
   assert.equal(await page.getByRole('button', { name: '下一页', exact: true }).isEnabled(), true)
   await page.getByText('10 条/页', { exact: true }).waitFor()
+  const headers = await page.getByRole('columnheader').allTextContents()
+  assert.ok(headers.indexOf('周预估金额') === headers.indexOf('周限') + 1)
+  assert.ok(headers.indexOf('周限刷新时间') === headers.indexOf('周预估金额') + 1)
+  assert.equal(await page.locator('.forecast-cell').count(), 10)
+  await page.locator('.forecast-value').first().waitFor()
+  assert.match(await page.locator('.forecast-cell').first().textContent(), /≈\$/)
+  assert.doesNotMatch(await page.locator('.forecast-cell').allTextContents().then(values => values.join(' ')), /Token|5小时|暂不支持/)
+  check('Weekly monetary estimate sits between usage and reset time without five-hour or token output')
   await page.screenshot({ path: `${artifacts}/desktop.png`, fullPage: true })
   check('UI 0.6 retains Chinese pagination, default 10 rows and non-Free account count')
 
@@ -41,6 +49,24 @@ try {
   await page.getByText('共 1 条', { exact: true }).waitFor()
   check('Pagination and account filtering still update the displayed rows')
 
+  await page.evaluate(() => {
+    const bridge = window.codexProxyPlugin, request = bridge.request.bind(bridge)
+    window.testForecastUsd = 151.25
+    bridge.request = async input => {
+      const response = await request(input)
+      if (input.path !== 'api/refresh') return response
+      const body = JSON.parse(new TextDecoder().decode(response.body))
+      body.forecast.forecasts[0].estimatedUsd = window.testForecastUsd
+      body.forecast.forecasts[0].estimatedUsdDisplay = window.testForecastUsd === null ? '—' : `$${window.testForecastUsd.toFixed(2)}`
+      body.forecast.forecasts[0].estimatedTokens = 2500000
+      body.forecast.forecasts[0].estimatedTokensDisplay = '2.50M'
+      return { ...response, body: new TextEncoder().encode(JSON.stringify(body)).buffer }
+    }
+  })
+  await page.getByRole('button', { name: '更新 team+sample12@example.com+2026/10/28+workspace3+region-a', exact: true }).click()
+  await page.getByText('≈$151.25', { exact: true }).waitFor()
+  check('Refreshing an account updates its capacity estimate immediately')
+
   await page.getByRole('button', { name: '重置卡 team+sample12@example.com+2026/10/28+workspace3+region-a', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await dialog.waitFor()
@@ -50,7 +76,7 @@ try {
   assert.equal(await dialog.getByRole('radio').nth(1).isChecked(), true)
   assert.equal(await dialog.getByRole('radio').nth(0).isChecked(), false)
   assert.equal(await dialog.getByRole('button', { name: '使用所选卡', exact: true }).isDisabled(), true)
-  await page.screenshot({ path: `${artifacts}/cards.png`, fullPage: true })
+  await page.screenshot({ path: `${artifacts}/cards.png`, fullPage: true, animations: 'disabled' })
   await dialog.getByText('确认消费一张卡，消费无法撤回', { exact: true }).click()
   assert.equal(await dialog.getByRole('checkbox').isChecked(), true)
   assert.equal(await dialog.getByRole('button', { name: '使用所选卡', exact: true }).isEnabled(), true)
@@ -61,8 +87,27 @@ try {
   await page.getByRole('button', { name: '导出筛选账号', exact: true }).click()
   await page.getByRole('dialog').waitFor()
   assert.match(await page.getByRole('textbox', { name: '账号 CSV 数据' }).inputValue(), /sample12@example.com/)
+  assert.match(await page.getByRole('textbox', { name: '账号 CSV 数据' }).inputValue(), /151\.25/)
   await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click()
   check('CSV export opens the shared dialog with the filtered account')
+
+  await page.evaluate(() => { window.testForecastUsd = 0 })
+  await page.getByRole('button', { name: '更新 team+sample12@example.com+2026/10/28+workspace3+region-a', exact: true }).click()
+  await page.getByText('≈$0.00', { exact: true }).waitFor()
+  await page.evaluate(() => { window.testForecastUsd = null })
+  await page.getByRole('button', { name: '更新 team+sample12@example.com+2026/10/28+workspace3+region-a', exact: true }).click()
+  await page.getByText('暂无预估', { exact: true }).waitFor()
+  assert.doesNotMatch(await page.locator('.forecast-cell').textContent(), /Token|2\.50M/)
+  assert.match(await page.locator('.forecast-cell').getAttribute('title'), /暂无金额预估/)
+  check('Zero USD remains visible and token-only forecasts are not presented as monetary estimates')
+
+  await page.getByRole('textbox', { name: '搜索账号', exact: true }).fill('sample42@example.com')
+  await page.getByText('暂无预估', { exact: true }).waitFor()
+  assert.match(await page.locator('.forecast-cell').getAttribute('title'), /不足 5 个百分点/)
+  await page.getByRole('textbox', { name: '搜索账号', exact: true }).fill('sample43@example.com')
+  await page.getByText('预估查询失败', { exact: true }).waitFor()
+  assert.equal(await page.locator('.account-name').count(), 1)
+  check('Insufficient samples and forecast query failures leave the account visible with an explicit reason')
 
   await page.goto(`${origin}?theme=dark`)
   await page.getByText('共 40 条', { exact: true }).waitFor()

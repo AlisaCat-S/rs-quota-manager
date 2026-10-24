@@ -11,6 +11,13 @@ export const planKey = (row: Row) => row.account.plan_type?.trim().toLowerCase()
 export const planLabel = (value: string) => ({ team: 'Team', plus: 'Plus', pro: 'Pro', prolite: 'ProLite', promax: 'ProMax', business: 'Business', enterprise: 'Enterprise', edu: 'Edu', go: 'Go', unknown: '未知套餐' }[value] || value)
 export const canReset = (row: Row) => row.account.provider_id === 'openai' && row.account.authentication_kind === 'oauth' && !isFree(row)
 export const week = (row: Row) => weeks(row).find(w => w.key.split(':')[0]?.toLowerCase() === 'codex') ?? weeks(row)[0]
+export const weeklyForecast = (row: Row) => row.forecast?.forecasts.find(f => f.period === 'weekly')
+export function forecastTitle(row: Row): string {
+  if (row.forecastError) return `${row.forecastError}，可读取最新快照重试`
+  const f = weeklyForecast(row)
+  if (!f) return '宿主暂无周限预估'
+  return [f.unavailableReason, f.estimatedUsd == null && !f.unavailableReason ? '暂无金额预估' : null, f.extrapolated ? `${f.targetDays} 天折算金额（USD）` : '本周期预估总金额（USD）', f.lowSample ? '样本较少，初步预估' : null, f.incompleteCost ? '费用记录不完整' : null, `预估时间 ${time(row.forecast?.generatedAt)}`].filter(Boolean).join('\n')
+}
 export const isLimited = (row: Row) => (week(row)?.used_percent ?? -1) >= 100 && (week(row)?.reset_at_ms ?? 0) > Date.now()
 export const isAutomaticEligible = (row: Row) => canReset(row) && row.account.enabled
 export const available = (card: Card, now = Date.now()) => card.status === 'available' && (!card.expiresAt || new Date(card.expiresAt).getTime() > now)
@@ -29,7 +36,7 @@ export function visualIndex(text: string, size: number) { return Array.from(text
 export function avatarTone(id: string) { return ['blue', 'green', 'orange', 'cyan'][visualIndex(id, 4)] }
 export function csv(rows: Row[]): string {
   const cell = (value: unknown) => { let s = String(value ?? ''); if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`; return `"${s.replaceAll('"', '""')}"` }
-  const data = [['账号ID', '完整名称', '邮箱', '启用', '周限已用%', '周限刷新时间', '周限观测时间', '卡张数', '卡到期时间', '卡观测时间', '自动使用', '状态'],
-    ...rows.map(r => [r.account.account_id, r.account.name, r.account.email, r.account.enabled, week(r)?.used_percent, time(week(r)?.reset_at_ms), time(r.quota?.observed_at_ms), r.state.cards?.availableCount, selectable(r).map(c => `${c.id}: ${time(c.expiresAt)}`).join(' | '), time(r.state.cardsObservedAtMs), r.state.automatic, status(r)])]
+  const data = [['账号ID', '完整名称', '邮箱', '启用', '周限已用%', '周限刷新时间', '周限观测时间', '卡张数', '卡到期时间', '卡观测时间', '自动使用', '状态', '周预估金额USD', '周预估说明'],
+    ...rows.map(r => [r.account.account_id, r.account.name, r.account.email, r.account.enabled, week(r)?.used_percent, time(week(r)?.reset_at_ms), time(r.quota?.observed_at_ms), r.state.cards?.availableCount, selectable(r).map(c => `${c.id}: ${time(c.expiresAt)}`).join(' | '), time(r.state.cardsObservedAtMs), r.state.automatic, status(r), weeklyForecast(r)?.estimatedUsd, forecastTitle(r)])]
   return '\uFEFF' + data.map(r => r.map(cell).join(',')).join('\r\n')
 }

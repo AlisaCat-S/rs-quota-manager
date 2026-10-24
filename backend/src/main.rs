@@ -2,6 +2,7 @@
 
 mod automation;
 mod engine;
+mod forecast;
 mod host;
 mod management;
 mod model;
