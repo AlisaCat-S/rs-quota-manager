@@ -1,13 +1,13 @@
 # 周限与重置卡
 
-独立 RS 网关插件，插件 ID 为 `personal.quota-manager`，当前源码版本 `0.1.5`，公开版本以 Releases 为准
+独立 RS 网关插件，插件 ID 为 `personal.quota-manager`，当前源码版本 `0.2.0`（尚未发版），公开安装包以 Releases 为准。
 
-基于上游 `v3.26.2` 的公开 SDK，固定提交 `ae5eaa46b447548571e6c46d69bd27d454adb785`，清单和进程协议为 v2，声明 management v1 与 maintenance v1
+基于上游 `v3.30.2` 的公开 SDK，固定提交 `76291f448cdf1d1da2027da32b7c949deb998c7a`。清单为 v2、进程协议为 v5，声明 management v2 与 maintenance v1；页面宿主桥仍为 v2。升级差异见 [SDK 适配记录](docs/SDK-UPGRADE-v0.2.0.md)。
 
 ## 安装与兼容
 
 - 下载：[安装包与校验文件](https://github.com/Lemon-57/rs-quota-manager/releases)
-- 宿主兼容范围：`>=3.26.2, <3.28.0`，已核对 v3.27.1 的账号、额度与卡片接口契约，实际安装验证范围见对应发行说明。
+- 当前源码宿主兼容范围：`>=3.30.2, <3.31.0`。RPC v5 与旧宿主不兼容，旧宿主请继续使用匹配其版本的既有发行包；不能仅修改包清单来升级协议。
 - 当前制品：Linux x86_64，glibc 2.28 及以上。尚未发布 ARM64、Windows 或 macOS 安装包。
 - 插件 ID：`personal.quota-manager`。为保留既有安装配置和私有状态，继续沿用该身份。
 - 许可证：Apache-2.0，第三方来源见 [LICENSES/NOTICE.md](LICENSES/NOTICE.md)。
@@ -32,7 +32,7 @@ CSV 包含账号 ID、完整名称和邮箱，若原名称含敏感内容，请�
 
 ## 使用
 
-在网关的插件管理中上传安装 `dist/personal.quota-manager-0.1.5-x86_64-unknown-linux-gnu.tar.gz`，核对旁边的 SHA-256 文件，接受来源并确认配置处于启用状态，再打开“周限与重置卡”页面
+使用 Release 安装包时，按该版本发行说明核对宿主范围和 SHA-256，再从插件管理安装、启用配置并打开“周限与重置卡”。当前源码需要先按下文构建，不能用旧 Release 安装包代替新版构建。
 
 - 读取 RS 当前账号套餐和启用状态，排除套餐为 Free 的账号，账号列只显示完整邮箱，无邮箱时回退到名称；列表同时显示会员标识、周限、刷新时间、卡张数及到期时间，内部 ID 与账号名称仍参与搜索和导出
 - 按宿主真实 `planType` 判断套餐，名称带 `team+` 的 Free 同样排除，列表、汇总、后台查询和新消费共用该规则
@@ -63,27 +63,31 @@ UUID 在消费前通过宿主私有状态持久化，结果不确定时暂停该
 每号保留最近 20 条已确认业务结果，宿主原生消费接口同时保留其自身的审计语义
 关闭自动开关阻止后续自动消费，已经发出的消费请求不会被撤回
 
+RS 新版另有“临期重置卡自动使用”，与本插件“周限耗尽时重置”的策略、开关和请求标识相互独立。本插件不修改宿主原生自动使用设置；同一账号建议只启用一种自动策略。宿主原生操作未决时可能返回 HTTP 409，本插件保留原卡与原 UUID，待冲突解除后通过“确认原操作”继续。
+
 ## 构建
 
 全部构建与验证在本机运行，生产服务器只接收完成的安装包
-Rust 使用 1.97.0，前端使用 Node 24 和 pnpm，SDK 与前端依赖由锁文件固定
+Rust 使用 1.99.1，前端使用 Node 24 和 pnpm，SDK 与前端依赖由锁文件固定。以下 `cargo` 命令需在 Rust 1.99.1 工具链下执行。
 
 ```powershell
 pnpm --dir frontend install --frozen-lockfile
 pnpm --dir frontend build
-cargo +1.97.0 fmt --manifest-path backend/Cargo.toml -- --check
-cargo +1.97.0 clippy --manifest-path backend/Cargo.toml --all-targets --locked -- -D warnings
-cargo +1.97.0 test --manifest-path backend/Cargo.toml --locked
-cargo +1.97.0 build --manifest-path backend/Cargo.toml --locked
+cargo fmt --manifest-path backend/Cargo.toml -- --check
+cargo clippy --manifest-path backend/Cargo.toml --all-targets --locked -- -D warnings
+cargo test --manifest-path backend/Cargo.toml --locked
+cargo build --manifest-path backend/Cargo.toml --locked
 node verification/protocol-test.mjs
 node verification/frontend-test.mjs
+pnpm --dir frontend exec playwright install chromium --only-shell
+node verification/ui-test.mjs
 ```
 
 Windows 本机生成 Linux 制品需要安装 Zig、cargo-zigbuild 和 Rust Linux target，把 Zig 与 cargo-zigbuild 加入 PATH
 
 ```powershell
-rustup target add x86_64-unknown-linux-gnu --toolchain 1.97.0
-cargo +1.97.0 zigbuild --manifest-path backend/Cargo.toml --release --locked --target x86_64-unknown-linux-gnu.2.28
+rustup target add x86_64-unknown-linux-gnu
+cargo zigbuild --manifest-path backend/Cargo.toml --release --locked --target x86_64-unknown-linux-gnu.2.28
 cpr-plugin package --manifest plugin.json --binary backend/target/x86_64-unknown-linux-gnu/release/quota-manager --target x86_64-unknown-linux-gnu --resource-map web=frontend/dist --resource-map legal=LICENSES --output-dir dist
 ```
 
@@ -93,7 +97,7 @@ Linux 原生开发可直接使用 `cargo build --release --target x86_64-unknown
 ## 上游复用
 
 按 Issue #278、官方 UI 安装文档和 plugins/workbench 示例核对，详见 `verification/UPSTREAM-COMPLIANCE.md`。
-UI 通过官方 v0.4.1 编译发行包安装，SHA-256 与官方校验文件一致，并写入 pnpm 锁文件 integrity；业务代码只导入公开组件、样式、主题与 Vite 入口。
+UI 通过官方 v0.6.0 编译发行包安装，完整性由 pnpm 锁文件 integrity 固定；业务代码只导入公开组件、样式、主题、语言包与 Vite 入口。根级 `ZConfigProvider` 使用 `zhHans`，保留中文分页、选择框与弹窗控件。
 插件示例仓库不是运行时依赖，复用其公开宿主桥、请求层与运行时解码组织方式，不导入其内部业务代码，也不降级当前宿主 SDK。
 来源与许可见 `LICENSES/NOTICE.md`，随插件包一并提供。
 
@@ -103,7 +107,9 @@ UI 通过官方 v0.4.1 编译发行包安装，SHA-256 与官方校验文件一�
 测试不访问真实网关或真实上游，不消费真实卡片
 
 `pnpm --dir frontend dev --port 5176` 提供带明确标识的本地模拟预览，发行页面只使用 `window.codexProxyPlugin` 宿主桥，不请求管理员密码或读取管理 Cookie
-安装包声明兼容 `>=3.26.2, <3.28.0`，已在 v3.26.2 宿主验证页面加载和真实账号分页，真实卡片消费未执行
+当前源码声明兼容 `>=3.30.2, <3.31.0`；本次验证包括真实 SDK 插件进程、模拟宿主及浏览器模拟页面，尚未执行 v3.30.2 宿主安装验收。旧版在 v3.26.2 的安装记录见历史验证文档，不能替代本次安装验收。真实卡片消费未执行。
+
+`verification/ui-test.mjs` 自动启动独立本地预览，验证中文控件、分页、筛选、选卡确认、CSV 和深色窄屏，并将截图写入忽略目录 `verification/ui-artifacts/`。
 
 ## 页面加载排查
 

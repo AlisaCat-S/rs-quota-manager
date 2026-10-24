@@ -1,5 +1,11 @@
 # 上游规范审查
 
+## 当前源码 v0.2.0
+
+SDK 已对齐 RS v3.30.2，进程协议升级为 v5、management 升级为 v2，清单与页面桥保持 v2。UI 升级至 v0.6.0，并通过公开 `ZConfigProvider` / `zhHans` 保留中文控件。差异分析、原生自动重置冲突处理和验证证据见 [SDK 适配记录](../docs/SDK-UPGRADE-v0.2.0.md)。
+
+## 历史审查 v0.1.3–v0.1.4
+
 审查范围：personal.quota-manager 0.1.2 -> 0.1.3。
 
 公开发布 v0.1.4 继续沿用上述修正，并使用公开 ZCard 指标卡与 ZTag 会员标签，配色和样式取自共享组件。

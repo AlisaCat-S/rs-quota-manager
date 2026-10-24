@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { Users, Gauge, Download, RefreshCw, Search, Settings2, TicketCheck, X, History, AlertTriangle, Save, RotateCcw, FilterX, CircleHelp } from '@lucide/vue'
 import { ZButton } from '@codex-proxy/ui/button'
+import { ZConfigProvider } from '@codex-proxy/ui/config-provider'
+import { zhHans } from '@codex-proxy/ui/locale'
 import { ZCard } from '@codex-proxy/ui/card'
 import { ZCheckbox } from '@codex-proxy/ui/checkbox'
 import { ZDialog } from '@codex-proxy/ui/dialog'
@@ -47,6 +49,7 @@ const statusTone = (row: Row) => row.state.pending || isLimited(row) ? 'warning'
 </script>
 
 <template>
+  <ZConfigProvider :locale="zhHans">
   <main class="quota-manager">
     <div v-if="preview" class="preview">本地预览数据</div>
     <div class="metrics">
@@ -116,4 +119,5 @@ const statusTone = (row: Row) => row.state.pending || isLimited(row) ? 'warning'
     </ZDialog>
     <ExportDialog v-model="showExport" :text="exportText" />
   </main>
+  </ZConfigProvider>
 </template>
