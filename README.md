@@ -1,18 +1,18 @@
 # 周限与重置卡
 
-独立 RS 网关插件，插件 ID 为 `personal.quota-manager`，当前源码版本 `0.2.0`（尚未发版），公开安装包以 Releases 为准。
+独立 RS 网关插件，插件 ID 为 `personal.quota-manager`，源码基线版本 `0.2.0`，自动发布使用 UTC 时间版本号，公开安装包以 Releases 为准。
 
 基于上游 `v3.30.2` 的公开 SDK，固定提交 `76291f448cdf1d1da2027da32b7c949deb998c7a`。清单为 v2、进程协议为 v5，声明 management v2 与 maintenance v1；页面宿主桥仍为 v2。升级差异见 [SDK 适配记录](docs/SDK-UPGRADE-v0.2.0.md)。
 
 ## 安装与兼容
 
-- 下载：[安装包与校验文件](https://github.com/Lemon-57/rs-quota-manager/releases)
+- 下载：[安装包与校验文件](https://github.com/AlisaCat-S/rs-quota-manager/releases)
 - 当前源码宿主兼容范围：`>=3.30.2, <3.31.0`。RPC v5 与旧宿主不兼容，旧宿主请继续使用匹配其版本的既有发行包；不能仅修改包清单来升级协议。
-- 当前制品：Linux x86_64，glibc 2.28 及以上。尚未发布 ARM64、Windows 或 macOS 安装包。
+- 自动构建目标：Linux x86_64 与 ARM64（aarch64），glibc 2.28 及以上；未提供 Windows 或 macOS 安装包。可用版本与附件以 Releases 为准。
 - 插件 ID：`personal.quota-manager`。为保留既有安装配置和私有状态，继续沿用该身份。
 - 许可证：Apache-2.0，第三方来源见 [LICENSES/NOTICE.md](LICENSES/NOTICE.md)。
 
-在 RS 的“插件管理 → 安装插件 → GitHub”中填写 `Lemon-57/rs-quota-manager`，版本标签留空查询最新稳定版，选择匹配架构的 `.tar.gz` 附件。
+在 RS 的“插件管理 → 安装插件 → GitHub”中填写 `AlisaCat-S/rs-quota-manager`，版本标签留空查询最新稳定版，选择匹配架构的 `.tar.gz` 附件。
 也可从 Release 下载 `.tar.gz` 与 `checksums.txt`，核对 SHA-256 后，通过“上传”安装。不要上传 GitHub 自动生成的 Source code 归档。
 安装时确认来源与插件权限，创建并启用配置，再从侧栏打开“周限与重置卡”。已有安装可通过宿主版本切换更新，保留实例与私有状态。
 
@@ -91,8 +91,22 @@ cargo zigbuild --manifest-path backend/Cargo.toml --release --locked --target x8
 cpr-plugin package --manifest plugin.json --binary backend/target/x86_64-unknown-linux-gnu/release/quota-manager --target x86_64-unknown-linux-gnu --resource-map web=frontend/dist --resource-map legal=LICENSES --output-dir dist
 ```
 
-`cpr-plugin` 应从上面的宿主固定提交构建，安装包支持 Linux x86_64、glibc 2.28 及以上
+`cpr-plugin` 应从上面的宿主固定提交构建，安装包支持 Linux x86_64 与 ARM64、glibc 2.28 及以上。手动构建 ARM64 时，将上述两条命令的 target 改为 `aarch64-unknown-linux-gnu`，二进制路径同步改为对应目录。
 Linux 原生开发可直接使用 `cargo build --release --target x86_64-unknown-linux-gnu` 后用同一 CLI 打包
+
+## 自动构建与发布
+
+推送到 `main` 的代码变更会自动构建并发布；仅修改 Markdown、`docs/` 或许可证文件不触发发布。也可在 [Actions → Build and release](https://github.com/AlisaCat-S/rs-quota-manager/actions/workflows/release.yml) 选择 `main`，点击 **Run workflow** 手动发布。其他分支手动运行和面向 `main` 的 PR 只验证、构建并保存 Actions 制品，不创建 Release。
+
+版本格式为 `YYYYMMDD.HHMMSS.运行序号`（UTC），例如 `20261024.103059.42`，标签为 `v20261024.103059.42`。SemVer 数字段不保留前导零，例如午夜为 `20261024.0.42`。同一次构建的两个架构共用版本；重跑生成新的时间版本。仅构建工作区的 `plugin.json` 被写入发布版本，不向源码提交回写版本号。
+
+流程先执行 Rust 检查、协议测试、前端构建和浏览器回归，再用 Zig 按 glibc 2.28 交叉构建两种架构，分别运行模拟宿主协议测试（ARM64 使用 QEMU）。打包工具固定到与 SDK 相同的上游提交。两个架构全部通过后才创建 Release，附件包括：
+
+- `personal.quota-manager-<版本>-x86_64-unknown-linux-gnu.tar.gz`
+- `personal.quota-manager-<版本>-aarch64-unknown-linux-gnu.tar.gz`
+- 各包同名 `.tar.gz.sha256` 与汇总 `checksums.txt`
+
+Release 标注源码提交、构建记录与宿主兼容范围。上传先进入草稿，全部成功后再公开；失败草稿可在该次构建记录定位并处理，不覆盖既有版本附件。此流程不部署用户网站，也不调用真实自动消费或重置卡接口。
 
 ## 上游复用
 
