@@ -91,14 +91,14 @@ cargo zigbuild --manifest-path backend/Cargo.toml --release --locked --target x8
 cpr-plugin package --manifest plugin.json --binary backend/target/x86_64-unknown-linux-gnu/release/quota-manager --target x86_64-unknown-linux-gnu --resource-map web=frontend/dist --resource-map legal=LICENSES --output-dir dist
 ```
 
-`cpr-plugin` 应从上面的宿主固定提交构建，安装包支持 Linux x86_64 与 ARM64、glibc 2.28 及以上。手动构建 ARM64 时，将上述两条命令的 target 改为 `aarch64-unknown-linux-gnu`，二进制路径同步改为对应目录。
+`cpr-plugin` 应从上面的宿主固定提交构建，安装包支持 Linux x86_64 与 ARM64、glibc 2.28 及以上。手动构建 ARM64 时，将上述命令中的 `x86_64-unknown-linux-gnu` 全部替换为 `aarch64-unknown-linux-gnu`，包括安装 Rust target、构建参数和二进制路径，保留 `.2.28` 后缀。
 Linux 原生开发可直接使用 `cargo build --release --target x86_64-unknown-linux-gnu` 后用同一 CLI 打包
 
 ## 自动构建与发布
 
 推送到 `main` 的代码变更会自动构建并发布；仅修改 Markdown、`docs/` 或许可证文件不触发发布。也可在 [Actions → Build and release](https://github.com/AlisaCat-S/rs-quota-manager/actions/workflows/release.yml) 选择 `main`，点击 **Run workflow** 手动发布。其他分支手动运行和面向 `main` 的 PR 只验证、构建并保存 Actions 制品，不创建 Release。
 
-版本格式为 `YYYYMMDD.HHMMSS.运行序号`（UTC），例如 `20261024.103059.42`，标签为 `v20261024.103059.42`。SemVer 数字段不保留前导零，例如午夜为 `20261024.0.42`。同一次构建的两个架构共用版本；重跑生成新的时间版本。仅构建工作区的 `plugin.json` 被写入发布版本，不向源码提交回写版本号。
+版本格式为 `YYYYMMDD.HHMMSS.运行序号`（UTC），例如 `20261024.103059.42`，标签为 `v20261024.103059.42`。SemVer 数字段不保留前导零，例如午夜为 `20261024.0.42`。同一次构建的两个架构共用版本；重新运行整个工作流会生成新的时间版本，只重跑失败任务则沿用原版本。仅构建工作区的 `plugin.json` 被写入发布版本，不向源码提交回写版本号。
 
 流程先执行 Rust 检查、协议测试、前端构建和浏览器回归，再用 Zig 按 glibc 2.28 交叉构建两种架构，分别运行模拟宿主协议测试（ARM64 使用 QEMU）。打包工具固定到与 SDK 相同的上游提交。两个架构全部通过后才创建 Release，附件包括：
 
