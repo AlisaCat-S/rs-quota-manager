@@ -12,10 +12,10 @@ This repository is an example collection, not a runtime dependency.
 
 ## codex-proxy-ui
 
-Source: https://github.com/zyycn/codex-proxy-ui/tree/v0.6.0
+Source: https://github.com/zyycn/codex-proxy-ui/tree/v0.6.1
 
 License: Apache-2.0. The upstream package includes its LICENSE.
-The plugin imports the official v0.6.0 compiled release via public package
+The plugin imports the official v0.6.1 compiled release via public package
 exports. Its components and styles are bundled without copying component
 implementations. Shared theme tokens come from the host; local preview alone
 initializes the public theme utilities. ZConfigProvider and the public zhHans

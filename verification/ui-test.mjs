@@ -38,7 +38,7 @@ try {
   assert.doesNotMatch(await page.locator('.forecast-cell').allTextContents().then(values => values.join(' ')), /Token|5小时|暂不支持/)
   check('Weekly monetary estimate sits between usage and reset time without five-hour or token output')
   await page.screenshot({ path: `${artifacts}/desktop.png`, fullPage: true })
-  check('UI 0.6 retains Chinese pagination, default 10 rows and non-Free account count')
+  check('UI 0.6.1 retains Chinese pagination, default 10 rows and non-Free account count')
 
   const firstEmail = await page.locator('.account-name').first().textContent()
   await page.getByRole('button', { name: '下一页', exact: true }).click()
@@ -118,6 +118,60 @@ try {
   const width = await page.evaluate(() => ({ page: document.documentElement.scrollWidth, viewport: innerWidth }))
   assert.ok(width.page <= width.viewport, 'Narrow page must not overflow outside the table scroller')
   check('Dark theme and 390px layout render without page-level horizontal overflow')
+
+  // Exercise the new width-aware pager through the real app, using mock rows only.
+  await page.evaluate(() => {
+    const bridge = window.codexProxyPlugin, request = bridge.request.bind(bridge)
+    bridge.request = async input => {
+      const response = await request(input)
+      if (input.path !== 'api/accounts') return response
+      const body = JSON.parse(new TextDecoder().decode(response.body))
+      const templates = body.accounts
+      body.accounts = Array.from({ length: 10000 }, (_, index) => {
+        const row = structuredClone(templates[index % templates.length])
+        const id = `pager_${String(index).padStart(5, '0')}`
+        row.account = { ...row.account, account_id: id, name: id, email: `${id}@example.com` }
+        if (row.quota) row.quota.account_id = id
+        if (row.forecast) row.forecast.accountId = id
+        return row
+      })
+      body.nextCursor = null
+      return { ...response, body: new TextEncoder().encode(JSON.stringify(body)).buffer }
+    }
+  })
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.getByRole('button', { name: '读取最新快照', exact: true }).click()
+  await page.getByText('共 10000 条', { exact: true }).waitFor()
+  const pager = page.getByRole('navigation', { name: '分页', exact: true })
+  await pager.getByRole('button', { name: '1000', exact: true }).click()
+  await page.getByText('pager_09990@example.com', { exact: true }).waitFor()
+  assert.equal(await page.locator('.account-name').count(), 10)
+  const activePage = pager.locator('[aria-current="page"]:visible')
+  assert.equal(await activePage.textContent(), '1000')
+  assert.ok(await activePage.evaluate(button => button.scrollWidth <= button.clientWidth), 'Four-digit page must not be clipped')
+  await page.screenshot({ path: `${artifacts}/pagination-desktop.png`, fullPage: true })
+  check('Four-digit page numbers fit and navigate to the correct account slice')
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  // At 390px the selector can still fit. A tighter embedded container must
+  // remove it rather than hiding the current page or either navigation button.
+  await page.locator('footer').evaluate(element => { element.style.width = '220px' })
+  await page.getByRole('combobox', { name: '每页条数', exact: true }).waitFor({ state: 'hidden' })
+  assert.equal(await activePage.textContent(), '1000')
+  await pager.getByRole('button', { name: '上一页', exact: true }).click()
+  await page.getByText('pager_09980@example.com', { exact: true }).waitFor()
+  await pager.getByRole('button', { name: '下一页', exact: true }).click()
+  await page.getByText('pager_09990@example.com', { exact: true }).waitFor()
+  const pagerWidth = await pager.evaluate(element => {
+    const { left, right } = element.getBoundingClientRect()
+    return { left, right, viewport: innerWidth }
+  })
+  assert.ok(pagerWidth.left >= 0 && pagerWidth.right <= pagerWidth.viewport, 'Narrow pager controls must remain on-screen')
+  await page.screenshot({ path: `${artifacts}/pagination-narrow.png`, fullPage: true })
+  await page.locator('footer').evaluate(element => { element.style.width = '' })
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.getByRole('combobox', { name: '每页条数', exact: true }).waitFor()
+  check('A 220px pager container hides page-size selection, retains navigation and restores it on resize')
 
   assert.deepEqual(errors, [])
   assert.deepEqual(externalRequests, [])

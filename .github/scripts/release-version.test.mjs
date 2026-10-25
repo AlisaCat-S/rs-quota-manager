@@ -6,6 +6,16 @@ import { spawnSync } from 'node:child_process'
 import { test } from 'node:test'
 import { releaseVersion } from './release-version.mjs'
 
+test('release packager and backend use the same pinned SDK revision', () => {
+  const cargo = readFileSync('backend/Cargo.toml', 'utf8')
+  const workflow = readFileSync('.github/workflows/release.yml', 'utf8')
+  const backend = cargo.match(/^gateway-plugin-sdk = \{[^\n]*rev = "([a-f0-9]{40})"/m)
+  const packager = workflow.match(/^  SDK_REV: ([a-f0-9]{40})$/m)
+  assert.ok(backend, 'Backend must pin the SDK to a full commit')
+  assert.ok(packager, 'Release workflow must pin the official packager source')
+  assert.equal(packager[1], backend[1])
+})
+
 test('UTC timestamp is numeric SemVer, including midnight and January', () => {
   assert.equal(releaseVersion(new Date('2026-01-02T00:00:01Z'), 3), '20260102.1.3')
   assert.equal(releaseVersion(new Date('2026-10-24T19:30:59+09:00'), 42), '20261024.103059.42')

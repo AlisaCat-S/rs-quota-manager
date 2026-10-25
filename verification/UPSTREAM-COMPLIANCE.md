@@ -1,10 +1,12 @@
 # 上游规范审查
 
-## 当前源码 v0.2.0
+## 当前源码 v0.2.1
 
-SDK 已对齐 RS v3.30.2，进程协议升级为 v5、management 升级为 v2，清单与页面桥保持 v2。UI 升级至 v0.6.0，并通过公开 `ZConfigProvider` / `zhHans` 保留中文控件。差异分析、原生自动重置冲突处理和验证证据见 [SDK 适配记录](../docs/SDK-UPGRADE-v0.2.0.md)。
+SDK 对齐 RS v3.31.1，固定提交 `06e1d8f0ac33d8633198d837c4f9017ad466f358`；UI 使用官方 v0.6.1 编译发行包。RPC v5、management v2、maintenance v1、清单及页面桥 v2 均未变。保留 v3.30.2 的使用条件，宿主范围扩展到 `>=3.30.2, <3.32.0`。中间件、上游适配器及移除字段的逐项影响见 [本次适配记录](../docs/SDK-UPGRADE-v0.2.1.md)；此前 RPC 升级见 [v0.2.0 记录](../docs/SDK-UPGRADE-v0.2.0.md)。
 
-### 周预估金额
+2026-10-25 本地验证通过：Rustfmt、严格 Clippy、6 项 Rust 测试、34 项模拟宿主协议场景、12 项前端契约用例、11 项浏览器回归、3 项发布脚本测试及生产构建。新增合同快照测试覆盖 v3.30.2 / v3.31.1 的清单、RPC 和实际声明能力；浏览器新增四位页码、220px 分页容器及恢复宽度后的交互。截图见 `verification/ui-artifacts/`。本次未发布、未切换网站，未执行真实宿主安装或卡片消费。
+
+### 周预估金额（v0.2.0 引入）
 
 管理页通过现有 `host.http.dispatch` 调用宿主相对路径 `GET /api/admin/accounts/quota-forecast?accountId=…`。RS v3.30.2 的 [查询实现](https://github.com/zyycn/codex-proxy-rs/blob/v3.30.2/backend/crates/gateway-admin/src/use_case/accounts/mod.rs) 使用 `refresh: false` 的额度观测和本地配对用量历史；[响应契约](https://github.com/zyycn/codex-proxy-rs/blob/v3.30.2/backend/crates/gateway-api/src/admin/accounts/wire.rs) 提供周/月预估。插件展示 `period: weekly` 的 `estimatedUsdDisplay`，保留金额原值用于导出，不自行按 Token 数或周期比例换算。页面与导出只展示周预估金额。
 

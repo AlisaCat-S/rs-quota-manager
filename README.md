@@ -1,13 +1,13 @@
 # 周限与重置卡
 
-独立 RS 网关插件，插件 ID 为 `personal.quota-manager`，源码基线版本 `0.2.0`，自动发布使用 UTC 时间版本号，公开安装包以 Releases 为准。
+独立 RS 网关插件，插件 ID 为 `personal.quota-manager`，源码基线版本 `0.2.1`，自动发布使用 UTC 时间版本号，公开安装包以 Releases 为准。
 
-基于上游 `v3.30.2` 的公开 SDK，固定提交 `76291f448cdf1d1da2027da32b7c949deb998c7a`。清单为 v2、进程协议为 v5，声明 management v2 与 maintenance v1；页面宿主桥仍为 v2。升级差异见 [SDK 适配记录](docs/SDK-UPGRADE-v0.2.0.md)。
+基于上游 `v3.31.1` 的公开 SDK，固定提交 `06e1d8f0ac33d8633198d837c4f9017ad466f358`。清单为 v2、进程协议为 v5，声明 management v2 与 maintenance v1；页面宿主桥仍为 v2。UI 使用 v0.6.1。升级差异与保留旧宿主支持的依据见 [SDK 适配记录](docs/SDK-UPGRADE-v0.2.1.md)。
 
 ## 安装与兼容
 
 - 下载：[安装包与校验文件](https://github.com/AlisaCat-S/rs-quota-manager/releases)
-- 当前源码宿主兼容范围：`>=3.30.2, <3.31.0`。RPC v5 与旧宿主不兼容，旧宿主请继续使用匹配其版本的既有发行包；不能仅修改包清单来升级协议。
+- 当前源码宿主兼容范围：`>=3.30.2, <3.32.0`。本次所用协议和能力合同未变，保留 v3.30.2 支持并纳入 v3.31.x；低于 v3.30.2 的宿主请使用匹配的旧版插件，不能仅修改包清单来升级协议。
 - 自动构建目标：Linux x86_64 与 ARM64（aarch64），glibc 2.28 及以上；未提供 Windows 或 macOS 安装包。可用版本与附件以 Releases 为准。
 - 插件 ID：`personal.quota-manager`。为保留既有安装配置和私有状态，继续沿用该身份。
 - 许可证：Apache-2.0，第三方来源见 [LICENSES/NOTICE.md](LICENSES/NOTICE.md)。
@@ -42,7 +42,7 @@ CSV 包含账号 ID、完整名称和邮箱，若原名称含敏感内容，请�
 - 手动使用通过每行的卡片图标打开，选择一张卡并确认消费
 - 自动使用默认关闭，总开关直接同步全部适用账号，不显示启用确认弹窗，开启后仍可逐号关闭；全局关闭时所有账号均停止自动使用并显示关闭，账号原有启用状态保持不变
 - 总开关关闭时单独开启某个账号，只开启该账号，其他账号保持关闭，逐号设置保存后刷新或重启仍生效
-- 日期按浏览器本地时区显示，支持搜索、筛选、排序和 CSV 导出；隔离页面不支持下载导航，导出改为官方弹窗中的只读 CSV 和复制、全选操作，不扩展宿主权限。分页复用 RS 使用统计的 ZPagination，默认每页 10 条，可选 10、20、50、100 条及页码跳转
+- 日期按浏览器本地时区显示，支持搜索、筛选、排序和 CSV 导出；隔离页面不支持下载导航，导出改为官方弹窗中的只读 CSV 和复制、全选操作，不扩展宿主权限。分页复用 RS 使用统计的 ZPagination，默认每页 10 条，可选 10、20、50、100 条及页码跳转；容器过窄时隐藏每页条数选择框，保留翻页和当前页码
 - 页面复用公开 ZCard 指标卡、ZTag 会员标签、输入框、开关、表格、分页和选卡控件，随宿主主题同步，可按会员标识和状态筛选
 - 检测间隔、批次大小和卡片更新间隔直接显示在工具栏，点击保存图标提交，未保存的修改可撤销，后台快照更新不会覆盖草稿
 - 后台刷新不禁用筛选与分页，不覆盖用户刚修改的开关，批量更新失败时保留账号列表
@@ -80,6 +80,7 @@ cargo test --manifest-path backend/Cargo.toml --locked
 cargo build --manifest-path backend/Cargo.toml --locked
 node verification/protocol-test.mjs
 node verification/frontend-test.mjs
+node --test .github/scripts/release-version.test.mjs
 pnpm --dir frontend exec playwright install chromium --only-shell
 node verification/ui-test.mjs
 ```
@@ -112,7 +113,7 @@ Release 标注源码提交、构建记录与宿主兼容范围。上传先进入
 ## 上游复用
 
 按 Issue #278、官方 UI 安装文档和 plugins/workbench 示例核对，详见 `verification/UPSTREAM-COMPLIANCE.md`。
-UI 通过官方 v0.6.0 编译发行包安装，完整性由 pnpm 锁文件 integrity 固定；业务代码只导入公开组件、样式、主题、语言包与 Vite 入口。根级 `ZConfigProvider` 使用 `zhHans`，保留中文分页、选择框与弹窗控件。
+UI 通过官方 v0.6.1 编译发行包安装，完整性由 pnpm 锁文件 integrity 固定；业务代码只导入公开组件、样式、主题、语言包与 Vite 入口。根级 `ZConfigProvider` 使用 `zhHans`，保留中文分页、选择框与弹窗控件。
 插件示例仓库不是运行时依赖，复用其公开宿主桥、请求层与运行时解码组织方式，不导入其内部业务代码，也不降级当前宿主 SDK。
 来源与许可见 `LICENSES/NOTICE.md`，随插件包一并提供。
 
@@ -122,9 +123,9 @@ UI 通过官方 v0.6.0 编译发行包安装，完整性由 pnpm 锁文件 integ
 测试不访问真实网关或真实上游，不消费真实卡片
 
 `pnpm --dir frontend dev --port 5176` 提供带明确标识的本地模拟预览，发行页面只使用 `window.codexProxyPlugin` 宿主桥，不请求管理员密码或读取管理 Cookie
-当前源码声明兼容 `>=3.30.2, <3.31.0`；本次验证包括真实 SDK 插件进程、模拟宿主及浏览器模拟页面，尚未执行 v3.30.2 宿主安装验收。旧版在 v3.26.2 的安装记录见历史验证文档，不能替代本次安装验收。真实卡片消费未执行。
+当前源码声明兼容 `>=3.30.2, <3.32.0`；本次验证包括 v3.30.2 / v3.31.1 的宿主合同快照、新 SDK 插件进程、模拟宿主及浏览器模拟页面，尚未执行这两个版本的真实宿主安装验收。旧版在 v3.26.2 的安装记录见历史验证文档，不能替代本次安装验收。真实卡片消费未执行。
 
-`verification/ui-test.mjs` 自动启动独立本地预览，验证中文控件、分页、筛选、选卡确认、CSV 和深色窄屏，并将截图写入忽略目录 `verification/ui-artifacts/`。
+`verification/ui-test.mjs` 自动启动独立本地预览，验证中文控件、分页、筛选、选卡确认、CSV 和深色窄屏，另以模拟的 10000 个账号验证四位页码与 220px 分页容器，并将截图写入忽略目录 `verification/ui-artifacts/`。
 
 ## 页面加载排查
 
