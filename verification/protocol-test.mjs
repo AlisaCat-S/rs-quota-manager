@@ -24,7 +24,10 @@ const runtimeAccount = a => ({ account_id: a.account_id, provider_id: a.provider
   credential_revision: 1, upstream_user_id: null, upstream_account_id: null, plan_type: a.plan, authentication_kind: 'oauth', credential_state: 'ready', has_refresh_token: true, access_token_expires_at_ms: null, next_refresh_at_ms: null })
 let consumeMode = 'reset', child, buffered, pending, ready, sequence = 99, errors = '', activeMode = 'normal', incarnation, handleSequence = 0, runtimeReads = 0, cardQueries = 0, failSelectionWrite = false
 
-// RPC v5 keeps only control fields in metadata. Request context and business
+const schedules = new Map(), residentCallbacks = new Map(), heldResumes = new Map()
+let holdResumes = false, suspensionCount = 0, consumptionCount = 0
+
+// RPC v7 keeps only control fields in metadata. Request context and business
 // JSON precede the raw body, with separate byte lengths (SDK client/frame.rs).
 function encode(meta, payload = Buffer.alloc(0)) {
   if (!(payload instanceof Buffer)) payload = Buffer.from(JSON.stringify(payload))
@@ -136,21 +139,64 @@ function parse() {
     assert.ok(contextBytes + dataBytes <= p)
     assert.equal(contextBytes, 0, 'Plugin responses must not contain an entry request snapshot')
     if (meta.type === 'callback' || meta.type === 'result') {
-      assert.ok(dataBytes > 0, 'RPC v5 requires a business JSON prefix')
+      assert.ok(dataBytes > 0, 'RPC v7 requires a business JSON prefix')
       const field = meta.type === 'callback' ? 'params' : 'result'
       assert.ok(!(field in meta), 'Business JSON must not leak back into control metadata')
       meta[field] = JSON.parse(buffered.subarray(12 + m + contextBytes, 12 + m + contextBytes + dataBytes).toString())
     } else assert.equal(dataBytes, 0)
     const payload = buffered.subarray(12 + m + contextBytes + dataBytes, total); buffered = buffered.subarray(total)
-    if (meta.type === 'ready') ready.resolve()
-    else if (meta.type === 'callback') callback(meta, payload).catch(e => { ready.reject(e); for (const x of pending.values()) x.reject(e) })
-    else if (meta.type === 'result' || meta.type === 'error') {
+    if (meta.type === 'ready') {
+      assert.equal(meta.protocol_version, 7)
+      assert.equal(meta.incarnation, incarnation)
+      assert.deepEqual(meta.call_budgets, {}, 'Use the SDK stage defaults, including maintenance 120s')
+      ready.resolve()
+    } else if (meta.type === 'suspend') {
+      assert.equal(payload.length, 0)
+      const schedule = schedules.get(meta.id)
+      assert.equal(schedule.phase, 'running')
+      assert.equal(meta.epoch, schedule.epoch + 1)
+      schedule.epoch = meta.epoch; schedule.phase = 'suspended'; suspensionCount++
+    } else if (meta.type === 'resume') {
+      assert.equal(payload.length, 0)
+      const schedule = schedules.get(meta.id)
+      assert.equal(schedule.phase, 'suspended')
+      assert.equal(meta.epoch, schedule.epoch)
+      schedule.phase = 'resuming'
+      if (holdResumes) heldResumes.set(meta.id, meta.epoch)
+      else authorizeResume(meta.id, meta.epoch)
+    } else if (meta.type === 'callback_consumed') {
+      assert.equal(payload.length, 0)
+      assert.equal(residentCallbacks.get(meta.id), meta.parent_id)
+      residentCallbacks.delete(meta.id); consumptionCount++
+    } else if (meta.type === 'callback') {
+      assert.equal(schedules.get(meta.parent_id).phase, 'running', 'No business processing before Resumed')
+      assert.ok(!residentCallbacks.has(meta.id))
+      residentCallbacks.set(meta.id, meta.parent_id)
+      callback(meta, payload).catch(e => { ready.reject(e); for (const x of pending.values()) x.reject(e) })
+    } else if (meta.type === 'result' || meta.type === 'error' || meta.type === 'cancelled') {
+      // Terminal calls reclaim remaining callbacks, including cancellation/timeout races.
+      for (const [id, parent] of residentCallbacks) if (parent === meta.id) residentCallbacks.delete(id)
+      schedules.delete(meta.id)
       const waiter = pending.get(meta.id)
-      if (waiter) { pending.delete(meta.id); meta.type === 'error' ? waiter.reject(new Error(JSON.stringify(meta.error))) : waiter.resolve({ result: meta.result, payload }) }
-    }
+      if (waiter) { pending.delete(meta.id); meta.type === 'result' ? waiter.resolve({ result: meta.result, payload }) : waiter.reject(new Error(meta.type === 'cancelled' ? 'cancelled' : JSON.stringify(meta.error))) }
+    } else assert.fail(`Unhandled plugin frame: ${meta.type}`)
+  }
+}
+function authorizeResume(id, epoch) {
+  const schedule = schedules.get(id)
+  if (schedule) { assert.equal(schedule.phase, 'resuming'); schedule.phase = 'running' }
+  heldResumes.delete(id)
+  send({ type: 'resumed', id, epoch })
+}
+async function waitFor(predicate) {
+  const deadline = Date.now() + 5000
+  while (!predicate()) {
+    assert.ok(Date.now() < deadline, 'Timed out waiting for scheduling control')
+    await new Promise(resolve => setTimeout(resolve, 5))
   }
 }
 async function start() {
+  schedules.clear(); residentCallbacks.clear(); heldResumes.clear(); holdResumes = false
   buffered = Buffer.alloc(0); pending = new Map(); ready = Promise.withResolvers(); errors = ''; incarnation = `test_${Date.now()}`
   child = spawn(binary, [], { stdio: ['pipe', 'pipe', 'pipe'] })
   child.stdout.on('data', data => { buffered = Buffer.concat([buffered, data]); parse() })
@@ -160,7 +206,7 @@ async function start() {
   await Promise.race([ready.promise, new Promise((_, reject) => setTimeout(() => reject(new Error(`Handshake timeout: ${errors}`)), 10000).unref())])
 }
 async function stop() { const exited = new Promise(resolve => child.once('exit', resolve)); send({ type: 'shutdown' }); child.stdin.end(); await exited }
-function hello(protocolVersion = 5, managementVersion = 2) {
+function hello(protocolVersion = 7, managementVersion = 2) {
   return { type: 'hello', handshake: { protocol_version: protocolVersion, artifact_sha256: 'a'.repeat(64), plugin_id: 'personal.quota-manager', instance_id: 'test_instance', generation: 1, incarnation, configuration: {}, contributes: {
     management: { id: 'personal.quota-manager.management', version: managementVersion, stages: ['management'] }, maintenance: { id: 'personal.quota-manager.maintenance', version: 1, stages: ['maintenance'] },
   } } }
@@ -179,9 +225,10 @@ async function rejectsHandshake(protocolVersion, managementVersion) {
     assert.ok(!callbacks.includes(Buffer.from('"type":"callback"')))
   } finally { clearTimeout(timer) }
 }
-async function call(method, params = {}, payload = Buffer.alloc(0), stage = 'management', requestContext) {
+async function call(method, params = {}, payload = Buffer.alloc(0), stage = 'management', requestContext, timeoutMs = stage === 'registration' ? 5000 : 120000) {
   const id = sequence += 2, waiter = Promise.withResolvers(); pending.set(id, waiter)
-  send({ type: 'call', id, method, params, context: { call_id: id, instance_id: 'test_instance', generation: 1, incarnation, stage, timeout_ms: 60000, resource_stream: false, resource_scope_id: `scope_${id}`, request: requestContext } }, payload)
+  schedules.set(id, { epoch: 0, phase: 'running' })
+  send({ type: 'call', id, method, params, context: { call_id: id, instance_id: 'test_instance', generation: 1, incarnation, stage, timeout_ms: timeoutMs, resource_stream: false, resource_scope_id: `scope_${id}`, request: requestContext } }, payload)
   return Promise.race([waiter.promise, new Promise((_, reject) => setTimeout(() => reject(new Error(`Call timeout ${method}: ${errors}`)), 10000).unref())])
 }
 async function request(path, body, query = '') {
@@ -194,16 +241,55 @@ try {
   await start()
   const registrationReply = await call('management.register', {}, Buffer.alloc(0), 'registration')
   const registration = JSON.parse(registrationReply.payload.toString()); assert.equal(registration.pages[0].entry, 'web/index.html'); assert.equal(registration.routes.length, 8)
-  check('SDK RPC v5 handshake and management v2 registration')
+  check('SDK RPC v7 handshake, default stage budgets and management v2 registration')
   const largeHeaders = [{ name: 'x-test', value: Buffer.from('x'.repeat(70000)).toString('base64') }, { name: 'x-test', value: Buffer.from([0, 128, 255]).toString('base64') }]
   const contextual = await call('management.handle', { method: 'GET', path: 'api/settings', query: '', content_type: null, headers: [] }, Buffer.alloc(0), 'management', { method: 'GET', uri: '/api/plugins/mock/api/settings', http_version: 'HTTP/1.1', headers: largeHeaders, peer_addr: '127.0.0.1:1234', client_ip: '127.0.0.1' })
   assert.equal(JSON.parse(contextual.payload.toString()).value.automatic, false)
-  check('RPC v5 separates large base64 request snapshots from control metadata and JSON body')
+  check('RPC v7 separates large base64 request snapshots from control metadata and JSON body')
   await rejectsHandshake(2, 2)
   await rejectsHandshake(4, 2)
+  await rejectsHandshake(5, 2)
+  await rejectsHandshake(6, 2)
   check('Old process protocols are rejected before any host operation')
-  await rejectsHandshake(5, 1)
+  await rejectsHandshake(7, 1)
   check('Obsolete management v1 is rejected before any host operation')
+  const settingsRequest = { method: 'GET', path: 'api/settings', query: '', content_type: null, headers: [] }
+  holdResumes = true
+  const beforeHeldReads = reads.length, beforeConsumed = consumptionCount
+  const held = call('management.handle', settingsRequest), heldId = sequence
+  await waitFor(() => heldResumes.has(heldId))
+  assert.equal(reads.length, beforeHeldReads + 1)
+  assert.equal(consumptionCount, beforeConsumed, 'Receiving a callback result does not consume it')
+  assert.ok([...residentCallbacks.values()].includes(heldId))
+  await new Promise(resolve => setTimeout(resolve, 25))
+  assert.equal(reads.length, beforeHeldReads + 1, 'The handler must wait for host execution admission')
+  holdResumes = false; authorizeResume(heldId, heldResumes.get(heldId))
+  assert.equal(JSON.parse((await held).payload.toString()).value.automatic, false)
+  assert.equal(consumptionCount, beforeConsumed + 2)
+  check('RPC v7 pairs suspend/resume epochs and consumes callback results only after Resumed')
+
+  holdResumes = true
+  const cancelled = call('management.handle', settingsRequest), cancelledId = sequence
+  const cancellation = assert.rejects(cancelled, /cancelled/)
+  await waitFor(() => heldResumes.has(cancelledId))
+  const cancelledEpoch = heldResumes.get(cancelledId), beforeCancelReads = reads.length
+  send({ type: 'cancel', id: cancelledId }); await cancellation
+  assert.ok(![...residentCallbacks.values()].includes(cancelledId))
+  holdResumes = false; authorizeResume(cancelledId, cancelledEpoch)
+  await request('api/settings')
+  assert.equal(reads.length, beforeCancelReads + 2, 'Late authorization must not restart a cancelled handler')
+  check('Cancellation while awaiting Resumed reclaims callbacks and ignores late authorization')
+
+  holdResumes = true
+  const timedOut = call('management.handle', settingsRequest, Buffer.alloc(0), 'management', undefined, 1000), timedOutId = sequence
+  const timeout = assert.rejects(timedOut, /timeout/)
+  await waitFor(() => heldResumes.has(timedOutId))
+  const timedOutEpoch = heldResumes.get(timedOutId)
+  await timeout
+  assert.ok(![...residentCallbacks.values()].includes(timedOutId))
+  holdResumes = false; authorizeResume(timedOutId, timedOutEpoch)
+  await request('api/settings')
+  check('Ordinary callback recovery waiting consumes the parent budget and timeout leaves the session usable')
   const page = await request('api/accounts'); assert.equal(page.status, 200); assert.equal(page.value.accounts.length, 2); assert.equal(page.value.nextCursor, 'acct_002'); assert.equal(page.value.accounts[0].account.name, accounts[0].name)
   assert.equal(page.value.accounts[0].account.plan_type, 'team'); assert.equal(page.value.accounts[1].account.enabled, false)
   assert.ok(page.value.accounts.every(row=>!row.state.automatic))
@@ -240,6 +326,20 @@ try {
   assert.equal(posts.length,beforeFreePosts); assert.equal(cardQueries,beforeFreeQueries)
   check('Free cannot refresh cards, change automation policy or start redemption')
   await scan(); assert.equal(posts.length, 0); check('Automatic consumption is off by default')
+  records.get('scan').value.nextAtMs = 0
+  const beforeShortBudget = reads.length
+  const beforeScanCursor = records.get('scan').value.cursor
+  holdResumes = true
+  const shortScan = call('plugin.reconcile', {}, Buffer.alloc(0), 'maintenance', undefined, 18500), shortScanId = sequence
+  await waitFor(() => heldResumes.has(shortScanId))
+  await new Promise(resolve => setTimeout(resolve, 650))
+  holdResumes = false; authorizeResume(shortScanId, heldResumes.get(shortScanId))
+  await shortScan
+  assert.ok(!reads.slice(beforeShortBudget).includes('host.data.quota.get'))
+  assert.equal(records.get('scan').value.cursor, beforeScanCursor)
+  assert.ok(records.get('scan').value.nextAtMs > Date.now())
+  assert.equal(posts.length, 0)
+  check('Maintenance counts prelude/recovery time in its remaining budget and persists its scan cursor')
   const saved = await request('api/settings', { value: { automatic: true, checkIntervalSeconds: 30, cardsRefreshSeconds: 3600, batchSize: 20 }, expectedVersion: null }); assert.equal(saved.status, 200)
   const conflict = await request('api/settings', { value: saved.value.value, expectedVersion: null }); assert.equal(conflict.status, 409); check('Settings reject stale writers')
   const automatic = enabled => request('api/automatic',{enabled,expectedVersion:records.get('settings')?.version??null})
@@ -310,5 +410,7 @@ try {
   consumeMode='reset';on=await automatic(true);assert.equal(on.status,200);records.get('account/acct_001').value.awaitingRecovery=false;records.get('account/acct_001').value.lastAttemptAtMs=Date.now()-120000;quotas.set('acct_001',quota('acct_001',100));records.get('scan').value.cursor=null;activeMode='automation_off';const beforeOffDuringRefresh=posts.length;await scan();assert.equal(posts.length,beforeOffDuringRefresh);assert.equal(records.get('settings').value.automatic,false);activeMode='normal'
   check('Master off observed during upstream refresh prevents a pending automatic redemption')
   assert.ok(!reads.includes('host.auth.get')); assert.ok(!reads.includes('host.auth.save')); check('No credentials are read or account settings modified')
+  assert.ok(suspensionCount > 0); assert.ok(consumptionCount > 0)
+  assert.equal(schedules.size, 0); assert.equal(residentCallbacks.size, 0)
   await stop(); console.log(JSON.stringify({ passed: passed.length, tests: passed, mockRedemptions: posts.length, productionRequests: 0 }, null, 2))
 } catch (e) { child?.kill(); console.error(e); process.exitCode = 1 }

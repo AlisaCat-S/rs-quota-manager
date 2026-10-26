@@ -1,13 +1,13 @@
 # 周限与重置卡
 
-独立 RS 网关插件，插件 ID 为 `personal.quota-manager`，源码基线版本 `0.2.1`，自动发布使用 UTC 时间版本号，公开安装包以 Releases 为准。
+独立 RS 网关插件，插件 ID 为 `personal.quota-manager`，源码基线版本 `0.3.0`，自动发布使用 UTC 时间版本号，公开安装包以 Releases 为准。
 
-基于上游 `v3.31.1` 的公开 SDK，固定提交 `06e1d8f0ac33d8633198d837c4f9017ad466f358`。清单为 v2、进程协议为 v5，声明 management v2 与 maintenance v1；页面宿主桥仍为 v2。UI 使用 v0.6.1。升级差异与保留旧宿主支持的依据见 [SDK 适配记录](docs/SDK-UPGRADE-v0.2.1.md)。
+对应宿主 **RS v3.33.0**，SDK 与官方打包工具固定提交 `8c8618aa0f841638262262e3338c115bc075f125`。清单为 v2、进程协议为 **RPC v7**，声明 management v2 与 maintenance v1；页面宿主桥仍为 v2。UI 使用 v0.7.0。见 [发布说明](docs/releases/v0.3.0.md)与 [SDK 差异及适配记录](docs/SDK-UPGRADE-v0.3.0.md)。
 
 ## 安装与兼容
 
 - 下载：[安装包与校验文件](https://github.com/AlisaCat-S/rs-quota-manager/releases)
-- 当前源码宿主兼容范围：`>=3.30.2, <3.32.0`。本次所用协议和能力合同未变，保留 v3.30.2 支持并纳入 v3.31.x；低于 v3.30.2 的宿主请使用匹配的旧版插件，不能仅修改包清单来升级协议。
+- 当前源码宿主兼容范围：`>=3.33.0, <3.34.0`。RPC v7 不兼容 v5/v6 宿主；v3.30.x–v3.31.x 使用本插件 0.2.x 源码对应的发行包，v3.32.x 需使用 RPC v6 插件。升级到 RS v3.33.0 时请安装本次新 SDK 重新构建、打包的制品，仅修改清单版本号无效。
 - 自动构建目标：Linux x86_64 与 ARM64（aarch64），glibc 2.28 及以上；未提供 Windows 或 macOS 安装包。可用版本与附件以 Releases 为准。
 - 插件 ID：`personal.quota-manager`。为保留既有安装配置和私有状态，继续沿用该身份。
 - 许可证：Apache-2.0，第三方来源见 [LICENSES/NOTICE.md](LICENSES/NOTICE.md)。
@@ -108,12 +108,12 @@ Linux 原生开发可直接使用 `cargo build --release --target x86_64-unknown
 - `personal.quota-manager-<版本>-aarch64-unknown-linux-gnu.tar.gz`
 - 各包同名 `.tar.gz.sha256` 与汇总 `checksums.txt`
 
-Release 标注源码提交、构建记录与宿主兼容范围。上传先进入草稿，全部成功后再公开；失败草稿可在该次构建记录定位并处理，不覆盖既有版本附件。此流程不部署用户网站，也不调用真实自动消费或重置卡接口。
+Release 标注源码基线 v0.3.0、对应宿主 RS v3.33.0、RPC v7、源码提交、构建记录与宿主兼容范围。上传先进入草稿，全部成功后再公开；失败草稿可在该次构建记录定位并处理，不覆盖既有版本附件。此流程不部署用户网站，也不调用真实自动消费或重置卡接口。
 
 ## 上游复用
 
 按 Issue #278、官方 UI 安装文档和 plugins/workbench 示例核对，详见 `verification/UPSTREAM-COMPLIANCE.md`。
-UI 通过官方 v0.6.1 编译发行包安装，完整性由 pnpm 锁文件 integrity 固定；业务代码只导入公开组件、样式、主题、语言包与 Vite 入口。根级 `ZConfigProvider` 使用 `zhHans`，保留中文分页、选择框与弹窗控件。
+UI 通过官方 v0.7.0 编译发行包安装，完整性由 pnpm 锁文件 integrity 固定；业务代码只导入公开组件、样式、主题、语言包与 Vite 入口。根级 `ZConfigProvider` 使用 `zhHans`，保留中文分页、选择框与弹窗控件。
 插件示例仓库不是运行时依赖，复用其公开宿主桥、请求层与运行时解码组织方式，不导入其内部业务代码，也不降级当前宿主 SDK。
 来源与许可见 `LICENSES/NOTICE.md`，随插件包一并提供。
 
@@ -123,7 +123,7 @@ UI 通过官方 v0.6.1 编译发行包安装，完整性由 pnpm 锁文件 integ
 测试不访问真实网关或真实上游，不消费真实卡片
 
 `pnpm --dir frontend dev --port 5176` 提供带明确标识的本地模拟预览，发行页面只使用 `window.codexProxyPlugin` 宿主桥，不请求管理员密码或读取管理 Cookie
-当前源码声明兼容 `>=3.30.2, <3.32.0`；本次验证包括 v3.30.2 / v3.31.1 的宿主合同快照、新 SDK 插件进程、模拟宿主及浏览器模拟页面，尚未执行这两个版本的真实宿主安装验收。旧版在 v3.26.2 的安装记录见历史验证文档，不能替代本次安装验收。真实卡片消费未执行。
+当前源码声明兼容 `>=3.33.0, <3.34.0`；本次验证包括 v3.33.0 的宿主合同快照、RPC v5/v6 宿主排除、新 SDK 插件进程的挂起/恢复授权、回调回收、取消/超时与原有业务回归，以及浏览器模拟页面。尚未执行 v3.33.0 的真实宿主安装验收；旧版在 v3.26.2 的安装记录见历史验证文档。真实卡片消费未执行。
 
 `verification/ui-test.mjs` 自动启动独立本地预览，验证中文控件、分页、筛选、选卡确认、CSV 和深色窄屏，另以模拟的 10000 个账号验证四位页码与 220px 分页容器，并将截图写入忽略目录 `verification/ui-artifacts/`。
 

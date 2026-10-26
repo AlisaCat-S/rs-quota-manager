@@ -38,7 +38,7 @@ try {
   assert.doesNotMatch(await page.locator('.forecast-cell').allTextContents().then(values => values.join(' ')), /Token|5小时|暂不支持/)
   check('Weekly monetary estimate sits between usage and reset time without five-hour or token output')
   await page.screenshot({ path: `${artifacts}/desktop.png`, fullPage: true })
-  check('UI 0.6.1 retains Chinese pagination, default 10 rows and non-Free account count')
+  check('UI 0.7.0 retains Chinese pagination, default 10 rows and non-Free account count')
 
   const firstEmail = await page.locator('.account-name').first().textContent()
   await page.getByRole('button', { name: '下一页', exact: true }).click()

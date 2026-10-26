@@ -1,4 +1,4 @@
-//! 固定上游宿主声明，防止 SDK 升级无意提高既有管理与维护入口的要求。
+//! 固定宿主合同，验证 RPC v7 的兼容范围并拒绝旧协议宿主。
 
 use gateway_plugin_sdk::{MANIFEST_VERSION, Manifest, PROTOCOL_VERSION};
 use serde_json::{Value, json};
@@ -44,19 +44,48 @@ fn assert_host_compatible(version: &str, declaration: &[u8]) {
 }
 
 #[test]
-fn existing_v3_30_2_host_remains_compatible() {
-    assert_host_compatible("3.30.2", include_bytes!("fixtures/host-v3.30.2.json"));
+fn latest_v3_33_0_host_is_compatible() {
+    assert_eq!(PROTOCOL_VERSION, 7);
+    assert_host_compatible("3.33.0", include_bytes!("fixtures/host-v3.33.0.json"));
 }
 
 #[test]
-fn latest_v3_31_1_host_is_compatible() {
-    assert_host_compatible("3.31.1", include_bytes!("fixtures/host-v3.31.1.json"));
+fn old_rpc_hosts_are_incompatible() {
+    let manifest = Manifest::from_author_slice(include_bytes!("../../plugin.json")).unwrap();
+    for (version, declaration) in [
+        (
+            "3.30.2",
+            include_bytes!("fixtures/host-v3.30.2.json").as_slice(),
+        ),
+        (
+            "3.31.1",
+            include_bytes!("fixtures/host-v3.31.1.json").as_slice(),
+        ),
+        (
+            "3.32.0",
+            include_bytes!("fixtures/host-v3.32.0.json").as_slice(),
+        ),
+    ] {
+        let host: Value = serde_json::from_slice(declaration).unwrap();
+        assert!(
+            !host["protocol_versions"]
+                .as_array()
+                .unwrap()
+                .contains(&json!(PROTOCOL_VERSION))
+        );
+        assert!(
+            !manifest
+                .engines
+                .codex_proxy_rs
+                .matches(&version.parse().unwrap())
+        );
+    }
 }
 
 #[test]
 fn host_range_excludes_unverified_contract_generations() {
     let manifest = Manifest::from_author_slice(include_bytes!("../../plugin.json")).unwrap();
-    for version in ["3.30.1", "3.32.0"] {
+    for version in ["3.33.0-rc.1", "3.34.0"] {
         assert!(
             !manifest
                 .engines

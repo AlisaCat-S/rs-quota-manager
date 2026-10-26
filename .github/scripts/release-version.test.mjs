@@ -16,6 +16,22 @@ test('release packager and backend use the same pinned SDK revision', () => {
   assert.equal(packager[1], backend[1])
 })
 
+test('release notes identify the source baseline and matching host compatibility', () => {
+  const manifest = JSON.parse(readFileSync('plugin.json', 'utf8'))
+  const frontend = JSON.parse(readFileSync('frontend/package.json', 'utf8'))
+  const cargo = readFileSync('backend/Cargo.toml', 'utf8')
+  const workflow = readFileSync('.github/workflows/release.yml', 'utf8')
+  const notes = readFileSync(`docs/releases/v${manifest.version}.md`, 'utf8')
+  assert.equal(frontend.version, manifest.version)
+  assert.equal(cargo.match(/^version = "([^"]+)"/m)[1], manifest.version)
+  for (const text of [workflow, notes]) {
+    assert.ok(text.includes(`源码基线：v${manifest.version}`))
+    assert.ok(text.includes('对应宿主：RS v3.33.0'))
+    assert.ok(text.includes(manifest.engines['codex-proxy-rs']))
+    assert.ok(text.includes('RPC v7'))
+  }
+})
+
 test('UTC timestamp is numeric SemVer, including midnight and January', () => {
   assert.equal(releaseVersion(new Date('2026-01-02T00:00:01Z'), 3), '20260102.1.3')
   assert.equal(releaseVersion(new Date('2026-10-24T19:30:59+09:00'), 42), '20261024.103059.42')

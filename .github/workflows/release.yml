@@ -17,7 +17,7 @@ concurrency:
 
 env:
   RUST_VERSION: 1.99.1
-  SDK_REV: 06e1d8f0ac33d8633198d837c4f9017ad466f358
+  SDK_REV: 8c8618aa0f841638262262e3338c115bc075f125
   CARGO_TERM_COLOR: always
 
 defaults:
@@ -161,8 +161,11 @@ jobs:
           sha256sum --check checksums.txt
           cat > release-notes.md <<'EOF'
           Linux x86_64 与 ARM64（aarch64）安装包，glibc >= 2.28。
-          宿主兼容范围：>=3.30.2, <3.32.0；SDK 对齐 RS v3.31.1，RPC v5、management v2、maintenance v1 不变。
-          低于 v3.30.2 的宿主请使用匹配的旧版插件。
+          源码基线：v0.3.0；对应宿主：RS v3.33.0。
+          宿主兼容范围：>=3.33.0, <3.34.0；SDK 与打包工具固定到 v3.33.0 提交 8c8618aa0f841638262262e3338c115bc075f125。
+          插件进程使用 RPC v7，支持协作式挂起、恢复授权和回调结果回收；management v2、maintenance v1、页面桥 v2 不变。
+          不兼容 RPC v5/v6 宿主；旧宿主请使用匹配的旧版插件。升级需安装新 SDK 重新构建并打包的制品，仅修改清单版本号无效。
+          保留插件身份、设置和私有状态，无状态迁移；已持久化的未决消费继续复用原卡和原 UUID。
           根据宿主架构选择 .tar.gz，在插件管理中安装；不要上传 Source code 归档。
           安装前使用 checksums.txt 或同名 .sha256 文件校验 SHA-256。
           自动使用默认关闭；真实重置卡消费无法撤回。验证仅使用模拟宿主和模拟数据。

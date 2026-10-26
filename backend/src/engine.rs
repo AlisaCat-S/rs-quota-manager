@@ -246,7 +246,7 @@ pub async fn consume(
     Ok(state)
 }
 
-pub async fn reconcile(host: &HostClient, budget_ms: u64) -> Result<(), PluginFault> {
+pub async fn reconcile(host: &HostClient) -> Result<(), PluginFault> {
     let (settings, _) = load::<Settings>(host, "settings").await?;
     let (selection, _) = load::<Selection>(host, "automation").await?;
     if !settings.valid() {
@@ -263,10 +263,13 @@ pub async fn reconcile(host: &HostClient, budget_ms: u64) -> Result<(), PluginFa
         settings.batch_size,
     )
     .await?;
-    let started = now();
     let mut network_used = false;
     for account in &page.accounts {
-        if now() - started > budget_ms.saturating_sub(18000) as i64 {
+        // 使用会话共享的剩余预算，包含前置查询、普通回调与恢复排队耗时。
+        if host
+            .remaining_budget()
+            .is_some_and(|remaining| remaining < std::time::Duration::from_secs(18))
+        {
             break;
         }
         scan.cursor = Some(account.account_id.clone());

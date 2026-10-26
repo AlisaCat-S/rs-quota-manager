@@ -46,7 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let Ok(_guard) = lock.try_lock() else {
                     return Ok(TypedReply::new(Empty {}));
                 };
-                engine::reconcile(&call.host, call.context.timeout_ms).await?;
+                engine::reconcile(&call.host).await?;
                 Ok(TypedReply::new(Empty {}))
             }
         })?

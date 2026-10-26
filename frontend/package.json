@@ -1,6 +1,6 @@
 {
   "name": "quota-manager-frontend",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -12,7 +12,7 @@
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
-    "@codex-proxy/ui": "https://github.com/zyycn/codex-proxy-ui/releases/download/v0.6.1/codex-proxy-ui-0.6.1.tgz",
+    "@codex-proxy/ui": "https://github.com/zyycn/codex-proxy-ui/releases/download/v0.7.0/codex-proxy-ui-0.7.0.tgz",
     "@lucide/vue": "1.47.0",
     "vue": "3.5.42"
   },
