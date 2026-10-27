@@ -1,4 +1,4 @@
-//! 固定宿主合同，验证 RPC v7 的兼容范围并拒绝旧协议宿主。
+//! 固定 v3.33 / v3.34 宿主合同，验证 RPC v7 并拒绝未适配的协议代次。
 
 use gateway_plugin_sdk::{MANIFEST_VERSION, Manifest, PROTOCOL_VERSION};
 use serde_json::{Value, json};
@@ -44,9 +44,15 @@ fn assert_host_compatible(version: &str, declaration: &[u8]) {
 }
 
 #[test]
-fn latest_v3_33_0_host_is_compatible() {
+fn previous_v3_33_0_host_remains_compatible() {
     assert_eq!(PROTOCOL_VERSION, 7);
     assert_host_compatible("3.33.0", include_bytes!("fixtures/host-v3.33.0.json"));
+}
+
+#[test]
+fn latest_v3_34_0_host_is_compatible() {
+    assert_eq!(PROTOCOL_VERSION, 7);
+    assert_host_compatible("3.34.0", include_bytes!("fixtures/host-v3.34.0.json"));
 }
 
 #[test]
@@ -85,7 +91,7 @@ fn old_rpc_hosts_are_incompatible() {
 #[test]
 fn host_range_excludes_unverified_contract_generations() {
     let manifest = Manifest::from_author_slice(include_bytes!("../../plugin.json")).unwrap();
-    for version in ["3.33.0-rc.1", "3.34.0"] {
+    for version in ["3.33.0-rc.1", "3.34.0-rc.1", "3.35.0"] {
         assert!(
             !manifest
                 .engines

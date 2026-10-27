@@ -108,8 +108,10 @@ async function callback(meta, payload) {
       assert.equal(state.pending.creditId, data.creditId)
       assert.match(data.redeemRequestId, /^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/)
       posts.push(structuredClone(data))
+      if (consumeMode === 'disconnect') { child.stdin.end(); return }
       if (consumeMode === 'uncertain') return error(meta.id, 'uncertain')
       if (consumeMode === 'host_conflict') { status = 409; envelope = { code: 409, message: '自动重置结果待确认，请稍后刷新' } }
+      else if (consumeMode === 'rate_limited') { status = 429; envelope = { code: 429, message: 'mock rate limit' } }
       else if (consumeMode === 'invalid') envelope = { code: 200, message: 'ok', data: {} }
       else {
         const c = cards.get(id)
@@ -201,7 +203,7 @@ async function start() {
   child = spawn(binary, [], { stdio: ['pipe', 'pipe', 'pipe'] })
   child.stdout.on('data', data => { buffered = Buffer.concat([buffered, data]); parse() })
   child.stderr.on('data', data => { errors += data }); child.on('error', e => ready.reject(e))
-  child.on('exit', code => { if (code) { const e = new Error(`Plugin exited ${code}: ${errors}`); ready.reject(e); for (const w of pending.values()) w.reject(e) } })
+  child.on('exit', code => { const e = new Error(`Plugin exited ${code}: ${errors}`); ready.reject(e); for (const w of pending.values()) w.reject(e) })
   send(hello())
   await Promise.race([ready.promise, new Promise((_, reject) => setTimeout(() => reject(new Error(`Handshake timeout: ${errors}`)), 10000).unref())])
 }
@@ -407,6 +409,39 @@ try {
   assert.equal(posts.at(-1).creditId, 'acct_008_early')
   assert.equal(nativeRetry.value.state.pending, null)
   check('Native automation HTTP 409 retains the original card and request ID until explicit retry')
+  consumeMode = 'rate_limited'
+  const rateLimited = await request('api/consume', { accountId: 'acct_008', creditId: 'acct_008_late' })
+  assert.equal(rateLimited.status, 200)
+  const limitedRequest = rateLimited.value.state.pending.requestId, beforeRateRetry = posts.length
+  assert.equal(rateLimited.value.state.history.length, 1)
+  assert.equal(cards.get('acct_008').availableCount, 1)
+  assert.equal((await request('api/consume', { accountId: 'acct_008', creditId: 'acct_008_late' })).status, 400)
+  quotas.set('acct_008', quota('acct_008', 100))
+  records.get('account/acct_008').value.lastAttemptAtMs = Date.now() - 120000
+  records.get('scan').value.cursor = 'acct_007'
+  await scan()
+  assert.equal(posts.length, beforeRateRetry, 'Inference replay eligibility must not retry card management POSTs')
+  consumeMode = 'reset'
+  const limitedRetry = await request('api/retry', { accountId: 'acct_008', requestId: limitedRequest })
+  assert.equal(posts.at(-1).redeemRequestId, limitedRequest)
+  assert.equal(posts.at(-1).creditId, 'acct_008_late')
+  assert.equal(limitedRetry.value.state.pending, null)
+  check('Management HTTP 429 never auto-replays a card POST and explicit retry preserves the original UUID')
+
+  consumeMode = 'disconnect'
+  await assert.rejects(request('api/consume', { accountId: 'acct_003', creditId: 'acct_003_early' }), /Plugin exited/)
+  const interrupted = posts.at(-1), beforeReconnect = posts.length
+  assert.equal(records.get('account/acct_003').value.pending.requestId, interrupted.redeemRequestId)
+  assert.equal(records.get('account/acct_003').value.history.length, 0)
+  await start()
+  assert.equal((await request('api/consume', { accountId: 'acct_003', creditId: 'acct_003_late' })).status, 400)
+  assert.equal(posts.length, beforeReconnect)
+  consumeMode = 'already_redeemed'
+  const reconnected = await request('api/retry', { accountId: 'acct_003', requestId: interrupted.redeemRequestId })
+  assert.equal(posts.at(-1).redeemRequestId, interrupted.redeemRequestId)
+  assert.equal(posts.at(-1).creditId, interrupted.creditId)
+  assert.equal(reconnected.value.state.pending, null)
+  check('Session EOF after dispatch preserves pending state and restart confirms only the original card and UUID')
   consumeMode='reset';on=await automatic(true);assert.equal(on.status,200);records.get('account/acct_001').value.awaitingRecovery=false;records.get('account/acct_001').value.lastAttemptAtMs=Date.now()-120000;quotas.set('acct_001',quota('acct_001',100));records.get('scan').value.cursor=null;activeMode='automation_off';const beforeOffDuringRefresh=posts.length;await scan();assert.equal(posts.length,beforeOffDuringRefresh);assert.equal(records.get('settings').value.automatic,false);activeMode='normal'
   check('Master off observed during upstream refresh prevents a pending automatic redemption')
   assert.ok(!reads.includes('host.auth.get')); assert.ok(!reads.includes('host.auth.save')); check('No credentials are read or account settings modified')
