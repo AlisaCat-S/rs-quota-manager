@@ -1,4 +1,4 @@
-//! 固定 v3.33 / v3.34 宿主合同，验证 RPC v7 并拒绝未适配的协议代次。
+//! 固定 v3.33–v3.37 宿主合同，验证 RPC v7 并拒绝未适配的协议代次。
 
 use gateway_plugin_sdk::{MANIFEST_VERSION, Manifest, PROTOCOL_VERSION};
 use serde_json::{Value, json};
@@ -50,9 +50,42 @@ fn previous_v3_33_0_host_remains_compatible() {
 }
 
 #[test]
-fn latest_v3_34_0_host_is_compatible() {
+fn previous_v3_34_0_host_remains_compatible() {
     assert_eq!(PROTOCOL_VERSION, 7);
     assert_host_compatible("3.34.0", include_bytes!("fixtures/host-v3.34.0.json"));
+}
+
+#[test]
+fn latest_and_intermediate_hosts_are_compatible() {
+    assert_eq!(PROTOCOL_VERSION, 7);
+    for (version, declaration) in [
+        (
+            "3.35.0",
+            include_bytes!("fixtures/host-v3.35.0.json").as_slice(),
+        ),
+        (
+            "3.35.1",
+            include_bytes!("fixtures/host-v3.35.1.json").as_slice(),
+        ),
+        (
+            "3.36.0",
+            include_bytes!("fixtures/host-v3.36.0.json").as_slice(),
+        ),
+        (
+            "3.37.0",
+            include_bytes!("fixtures/host-v3.37.0.json").as_slice(),
+        ),
+        (
+            "3.37.1",
+            include_bytes!("fixtures/host-v3.37.1.json").as_slice(),
+        ),
+        (
+            "3.37.2",
+            include_bytes!("fixtures/host-v3.37.2.json").as_slice(),
+        ),
+    ] {
+        assert_host_compatible(version, declaration);
+    }
 }
 
 #[test]
@@ -91,7 +124,7 @@ fn old_rpc_hosts_are_incompatible() {
 #[test]
 fn host_range_excludes_unverified_contract_generations() {
     let manifest = Manifest::from_author_slice(include_bytes!("../../plugin.json")).unwrap();
-    for version in ["3.33.0-rc.1", "3.34.0-rc.1", "3.35.0"] {
+    for version in ["3.33.0-rc.1", "3.37.2-rc.1", "3.38.0"] {
         assert!(
             !manifest
                 .engines

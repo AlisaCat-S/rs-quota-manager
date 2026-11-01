@@ -1,6 +1,12 @@
 # 上游规范审查
 
-## 当前源码 v0.3.1
+## 当前源码 v0.3.2
+
+对应最新稳定宿主 RS v3.37.2，SDK、Cargo 锁文件与官方打包工具固定提交 `641f43b3030b1c68961e05d525e58ec6f4264a15`。RPC v7、management v2、maintenance v1、清单 v2、页面桥 v2 不变，范围扩展到 `>=3.33.0, <3.38.0`。UI 升至官方 v0.8.0，以公开 `themePrefix: 'cp'` 和生成的页面元数据兼容新旧主题桥，本地预览迁移到 `createTheme` / `applyTheme`。目录 v1 移除、宿主设置类型替换、互联 API Key 等差异见 [适配记录](../docs/SDK-UPGRADE-v0.3.2.md)，安装条件见 [发布说明](../docs/releases/v0.3.2.md)。
+
+2026-11-01 本地验证通过：Rustfmt、严格 Clippy、debug 构建、8 项 Rust 测试、41 项真实 SDK / 模拟宿主协议场景、12 项前端契约测试、13 项浏览器回归、4 项发布脚本测试和生产构建。新增六份宿主合同快照、API Key 卡片操作隔离，以及生产页面中新旧主题注入和明暗切换检查。实际检查桌面、选卡、深色及窄屏截图，位于 `verification/ui-artifacts/`。Linux 双架构构建、打包与公开发布由推送 main 触发现有工作流；真实宿主安装、网站切换及卡片消费未执行。
+
+## 历史源码 v0.3.1
 
 对应最新稳定宿主 RS v3.34.0，SDK、Cargo 锁文件与官方打包工具固定提交 `47d30474af7c3e1fab433f2d4a70430fae548ff2`。RPC v7、management v2、maintenance v1、清单 v2、页面桥 v2 和 UI v0.7.0 不变；本插件不声明新增的模型目录 v2。所用合同未变，保留 RS v3.33.x 兼容，范围扩展为 `>=3.33.0, <3.35.0`。稳定版与 main 的目录合同差异、启动兼容检查及 429 重放边界见 [适配记录](../docs/SDK-UPGRADE-v0.3.1.md)，安装条件见 [发布说明](../docs/releases/v0.3.1.md)。
 

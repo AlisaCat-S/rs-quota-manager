@@ -5,7 +5,8 @@ import { defineConfig } from 'vite'
 
 export default defineConfig({
   base: './',
-  plugins: [vue(), tailwindcss(), CodexProxyUI(), {
+  // 新宿主按元数据注入前缀，保留 cp 也兼容旧宿主固定的主题变量。
+  plugins: [vue(), tailwindcss(), CodexProxyUI({ themePrefix: 'cp' }), {
     name: 'plugin-classic-script',
     transformIndexHtml: { order: 'post', handler: html => html.replace('type="module" crossorigin', 'defer') },
   }],

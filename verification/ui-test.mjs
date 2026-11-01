@@ -2,12 +2,12 @@ import assert from 'node:assert/strict'
 import { mkdir } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { chromium } from '../frontend/node_modules/playwright/index.mjs'
-import { createServer } from '../frontend/node_modules/vite/dist/node/index.js'
+import { createServer, preview } from '../frontend/node_modules/vite/dist/node/index.js'
 
 // A fresh local preview owns all state. No real host, credentials or card calls.
 const artifacts = fileURLToPath(new URL('./ui-artifacts/', import.meta.url))
 const server = await createServer({ root: fileURLToPath(new URL('../frontend', import.meta.url)), server: { host: '127.0.0.1', port: 0 }, logLevel: 'error' })
-let browser, page
+let browser, page, production
 const passed = [], errors = [], externalRequests = []
 const check = name => { passed.push(name); console.log(`PASS ${name}`) }
 try {
@@ -38,7 +38,7 @@ try {
   assert.doesNotMatch(await page.locator('.forecast-cell').allTextContents().then(values => values.join(' ')), /Token|5小时|暂不支持/)
   check('Weekly monetary estimate sits between usage and reset time without five-hour or token output')
   await page.screenshot({ path: `${artifacts}/desktop.png`, fullPage: true })
-  check('UI 0.7.0 retains Chinese pagination, default 10 rows and non-Free account count')
+  check('UI 0.8.0 retains Chinese pagination, default 10 rows and non-Free account count')
 
   const firstEmail = await page.locator('.account-name').first().textContent()
   await page.getByRole('button', { name: '下一页', exact: true }).click()
@@ -173,6 +173,57 @@ try {
   await page.getByRole('combobox', { name: '每页条数', exact: true }).waitFor()
   check('A 220px pager container hides page-size selection, retains navigation and restores it on resize')
 
+  // Exercise the built page without the development-only theme initializer.
+  production = await preview({ root: fileURLToPath(new URL('../frontend', import.meta.url)), preview: { host: '127.0.0.1', port: 0 }, logLevel: 'error' })
+  const productionOrigin = production.resolvedUrls.local[0]
+  const hostPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
+  page = hostPage
+  hostPage.on('pageerror', error => errors.push(error.message))
+  await hostPage.route('**/*', route => {
+    if (new URL(route.request().url()).origin === new URL(productionOrigin).origin) return route.continue()
+    externalRequests.push(route.request().url())
+    return route.abort()
+  })
+  await hostPage.addInitScript(() => {
+    let scheme = 'light'
+    window.codexProxyPlugin = {
+      version: 2, get theme() { return scheme },
+      async request(input) {
+        if (input.method !== 'GET') throw new Error('Theme checks must remain read-only')
+        const body = input.path === 'api/settings'
+          ? { value: { automatic: false, checkIntervalSeconds: 30, cardsRefreshSeconds: 3600, batchSize: 20 }, version: null }
+          : { accounts: [], excludedPending: [], nextCursor: null, generatedAtMs: Date.now() }
+        return { status: 200, contentType: 'application/json', body: new TextEncoder().encode(JSON.stringify(body)).buffer }
+      },
+    }
+    window.testHostTheme = (legacy, theme) => {
+      scheme = theme.scheme
+      const root = document.documentElement
+      const prefix = document.querySelector('meta[name="codex-proxy-ui-theme-prefix"]')?.content ?? 'z'
+      // v3.33–v3.36 use --cp-* wire names; v3.37 uses semantic names and page metadata.
+      for (const [name, value] of Object.entries(theme.tokens)) root.style.setProperty(legacy ? `--cp-${name}` : `--${prefix}-${name}`, value)
+      root.dataset.theme = scheme
+      window.dispatchEvent(new CustomEvent('codex-proxy-themechange', { detail: { theme: scheme } }))
+    }
+  })
+  const { createTheme } = await server.ssrLoadModule('@codex-proxy/ui/theme')
+  for (const legacy of [true, false]) {
+    await hostPage.goto(productionOrigin)
+    await hostPage.getByText('暂无账号', { exact: true }).waitFor()
+    assert.equal(await hostPage.locator('meta[name="codex-proxy-ui-theme-prefix"]').getAttribute('content'), 'cp')
+    assert.equal(await hostPage.locator('.preview, [data-z-runtime-theme]').count(), 0)
+    for (const scheme of ['light', 'dark']) {
+      const theme = createTheme({ scheme })
+      theme.tokens['color-bg-container'] = scheme === 'dark' ? 'rgb(29, 36, 44)' : 'rgb(247, 248, 249)'
+      theme.tokens['card-bg'] = theme.tokens['color-bg-container']
+      theme.tokens['color-text'] = scheme === 'dark' ? 'rgb(230, 231, 232)' : 'rgb(35, 36, 37)'
+      await hostPage.evaluate(({ legacy, theme }) => window.testHostTheme(legacy, theme), { legacy, theme })
+      assert.equal(await hostPage.locator('html').getAttribute('data-theme'), scheme)
+      assert.equal(await hostPage.locator('.quota-manager').evaluate(element => getComputedStyle(element).color), theme.tokens['color-text'])
+      for (const selector of ['.work-area', '.metric']) assert.equal(await hostPage.locator(selector).first().evaluate(element => getComputedStyle(element).backgroundColor), theme.tokens['color-bg-container'])
+    }
+    check(`Production UI follows ${legacy ? 'v3.33–v3.36 prefixed' : 'v3.37 semantic'} host tokens and theme changes without local theme defaults`)
+  }
   assert.deepEqual(errors, [])
   assert.deepEqual(externalRequests, [])
   console.log(JSON.stringify({ passed: passed.length, tests: passed, productionRequests: 0, artifacts }, null, 2))
@@ -184,5 +235,6 @@ try {
   throw error
 } finally {
   await browser?.close()
+  await production?.close()
   await server.close()
 }

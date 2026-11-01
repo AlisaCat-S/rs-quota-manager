@@ -21,7 +21,7 @@ const cards = new Map(accounts.map(a => [a.account_id, { availableCount: 2, cred
 ] }]))
 const records = new Map(), posts = [], refreshCalls = [], reads = [], handles = new Map()
 const runtimeAccount = a => ({ account_id: a.account_id, provider_id: a.provider_id, name: a.name, email: a.email, enabled: a.enabled,
-  credential_revision: 1, upstream_user_id: null, upstream_account_id: null, plan_type: a.plan, authentication_kind: 'oauth', credential_state: 'ready', has_refresh_token: true, access_token_expires_at_ms: null, next_refresh_at_ms: null })
+  credential_revision: 1, upstream_user_id: null, upstream_account_id: null, plan_type: a.plan, authentication_kind: a.authentication_kind ?? 'oauth', credential_state: 'ready', has_refresh_token: true, access_token_expires_at_ms: null, next_refresh_at_ms: null })
 let consumeMode = 'reset', child, buffered, pending, ready, sequence = 99, errors = '', activeMode = 'normal', incarnation, handleSequence = 0, runtimeReads = 0, cardQueries = 0, failSelectionWrite = false
 
 const schedules = new Map(), residentCallbacks = new Map(), heldResumes = new Map()
@@ -364,6 +364,16 @@ try {
   on=await automatic(true);assert.equal(on.status,200)
   const scanState=records.get('scan');scanState.value.cursor='acct_005';scanState.value.nextAtMs=0;const beforeFreeScan=cardQueries;quotas.set('acct_006',quota('acct_006',100));quotas.set('acct_007',quota('acct_007',100));await scan();assert.equal(cardQueries,beforeFreeScan);assert.equal(posts.length,0)
   check('Background scan skips Free even when a weekly limit exists')
+  accounts[7].authentication_kind = 'api_key'; quotas.set('acct_008', quota('acct_008', 100))
+  const beforePeerCards = cardQueries, beforePeerRefresh = refreshCalls.length, beforePeerPosts = posts.length
+  const peerPage = await request('api/accounts', undefined, 'cursor=acct_007')
+  assert.equal(peerPage.value.accounts[0].account.authentication_kind, 'api_key')
+  assert.equal(peerPage.value.accounts[0].state.automatic, false)
+  for (const path of ['api/refresh', 'api/consume', 'api/policy']) assert.equal((await request(path, { accountId: 'acct_008', creditId: 'acct_008_early', automatic: true })).status, 400)
+  records.get('scan').value.cursor = 'acct_007'; await scan()
+  assert.equal(cardQueries, beforePeerCards); assert.equal(refreshCalls.length, beforePeerRefresh); assert.equal(posts.length, beforePeerPosts)
+  delete accounts[7].authentication_kind; quotas.set('acct_008', quota('acct_008'))
+  check('CPR-linked API Key accounts stay visible but cannot enable automation, query cards or redeem')
   records.get('scan').value.cursor = null; quotas.set('acct_001', quota('acct_001', 100)); quotas.set('acct_002', quota('acct_002', 100))
   await scan(); assert.equal(posts.length, 1); assert.equal(posts[0].creditId, 'acct_001_early'); assert.ok(refreshCalls.includes('acct_001')); assert.equal(accounts[1].enabled, false)
   check('Fresh weekly exhaustion redeems earliest expiry and preserves pause state')
