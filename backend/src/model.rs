@@ -242,6 +242,26 @@ mod tests {
     }
 
     #[test]
+    fn peer_link_v2_budget_and_pool_windows_are_not_oauth_weekly_limits() {
+        for (key, seconds) in [
+            ("peer:budget:weekly", 604800),
+            ("peer:budget:monthly", 2592000),
+            ("peer:budget:custom", 604800),
+            ("peer:4:anon:general:weekly", 604800),
+        ] {
+            let facts = quota(key, seconds, 100.0, 1000, 200000);
+            assert!(account_weekly(&facts).is_none());
+            assert!(!exhausted(&facts, 2000));
+        }
+        let mut facts = quota("peer:budget:unknown", 604800, 100.0, 1000, 200000);
+        facts.windows[0].window_seconds = None;
+        facts.windows[0].used_percent = None;
+        facts.windows[0].reset_at_ms = None;
+        assert!(account_weekly(&facts).is_none());
+        assert!(!exhausted(&facts, 2000));
+    }
+
+    #[test]
     fn picks_earliest_unexpired_weekly_card() {
         let card = |id: &str, expiry: &str, title: &str, status: &str| Card {
             id: id.into(),

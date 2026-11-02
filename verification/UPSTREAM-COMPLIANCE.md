@@ -1,6 +1,12 @@
 # 上游规范审查
 
-## 当前源码 v0.3.2
+## 当前源码 v0.3.3
+
+对应最新稳定宿主 RS v3.38.1，SDK、Cargo 锁文件与官方打包工具固定提交 `e0b7a841ca074f17e11dad73f39a159c75cb2fb1`。RPC v7、management v2、maintenance v1、清单 v2、页面桥 v2 不变，宿主范围扩展到 `>=3.33.0, <3.39.0`，继续支持 v3.33–v3.37。UI 已是最新稳定版 v0.8.0，无需更新。SDK 内部重命名、CPR Link v2、模型调度及原生重置卡任务的逐项判断见 [适配记录](../docs/SDK-UPGRADE-v0.3.3.md)，安装条件见 [发布说明](../docs/releases/v0.3.3.md)。
+
+2026-11-02 本地验证通过：Rustfmt、严格 Clippy、debug 构建、9 项 Rust 测试、41 项真实 SDK / 模拟宿主协议场景、12 项前端契约测试、13 项浏览器回归、4 项发布脚本测试和生产构建。新增 v3.38.0 / v3.38.1 宿主原始合同快照与互联周 / 月 / 自定义预算、池内额度、未知窗口不触发 OAuth 消费的回归。截图位于 `verification/ui-artifacts/`。Linux 双架构构建、打包与发布由推送 main 触发现有工作流；真实宿主安装、网站部署及卡片消费未执行。
+
+## 历史源码 v0.3.2
 
 对应最新稳定宿主 RS v3.37.2，SDK、Cargo 锁文件与官方打包工具固定提交 `641f43b3030b1c68961e05d525e58ec6f4264a15`。RPC v7、management v2、maintenance v1、清单 v2、页面桥 v2 不变，范围扩展到 `>=3.33.0, <3.38.0`。UI 升至官方 v0.8.0，以公开 `themePrefix: 'cp'` 和生成的页面元数据兼容新旧主题桥，本地预览迁移到 `createTheme` / `applyTheme`。目录 v1 移除、宿主设置类型替换、互联 API Key 等差异见 [适配记录](../docs/SDK-UPGRADE-v0.3.2.md)，安装条件见 [发布说明](../docs/releases/v0.3.2.md)。
 
