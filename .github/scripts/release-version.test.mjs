@@ -28,7 +28,7 @@ test('release notes identify the source baseline and matching host compatibility
   assert.equal(cargo.match(/^version = "([^"]+)"/m)[1], manifest.version)
   for (const text of [workflow, notes]) {
     assert.ok(text.includes(`源码基线：v${manifest.version}`))
-    assert.ok(text.includes('对应宿主：RS v3.38.1'))
+    assert.ok(text.includes('对应宿主：RS v3.39.1'))
     assert.ok(text.includes(manifest.engines['codex-proxy-rs']))
     assert.ok(text.includes('RPC v7'))
   }
