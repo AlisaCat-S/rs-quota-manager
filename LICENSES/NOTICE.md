@@ -12,15 +12,17 @@ This repository is an example collection, not a runtime dependency.
 
 ## codex-proxy-ui
 
-Source: https://github.com/zyycn/codex-proxy-ui/tree/v0.8.0
+Source: https://github.com/zyycn/codex-proxy-ui/tree/v0.9.0
 
 License: Apache-2.0. The upstream package includes its LICENSE.
-The plugin imports the official v0.8.0 compiled release via public package
+The plugin imports the official v0.9.0 compiled release via public package
 exports. Its components and styles are bundled without copying component
 implementations. Shared theme tokens come from the host; local preview alone
 initializes the public theme utilities. ZConfigProvider and the public zhHans
 locale preserve the Chinese interface after the upstream default changed to English.
 The public Vite themePrefix option preserves the cp CSS-variable namespace for
 older hosts and advertises it to the semantic-token bridge in RS v3.37.
+The new popover-shadow token falls back to the old box-shadow token when the
+host does not supply it; modern host tokens still take precedence.
 
 Package integrity is pinned in frontend/pnpm-lock.yaml.

@@ -1,4 +1,6 @@
 :root { font-family: var(--cp-font-family); color: var(--cp-color-text); background: transparent; }
+/* UI 0.9 浮层改用独立阴影；旧宿主仍使用原阴影，新宿主的内联 token 优先。 */
+:root { --cp-popover-shadow: var(--cp-box-shadow); }
 * { box-sizing: border-box; letter-spacing: 0; }
 body { margin: 0; min-width: 0; min-height: inherit; font-size: var(--cp-font-size); background: transparent; }
 #app, .quota-manager { min-height: inherit; min-width: 0; }

@@ -38,7 +38,7 @@ try {
   assert.doesNotMatch(await page.locator('.forecast-cell').allTextContents().then(values => values.join(' ')), /Token|5小时|暂不支持/)
   check('Weekly monetary estimate sits between usage and reset time without five-hour or token output')
   await page.screenshot({ path: `${artifacts}/desktop.png`, fullPage: true })
-  check('UI 0.8.0 retains Chinese pagination, default 10 rows and non-Free account count')
+  check('UI 0.9.0 retains Chinese pagination, default 10 rows and non-Free account count')
 
   const firstEmail = await page.locator('.account-name').first().textContent()
   await page.getByRole('button', { name: '下一页', exact: true }).click()
@@ -207,13 +207,18 @@ try {
     }
   })
   const { createTheme } = await server.ssrLoadModule('@codex-proxy/ui/theme')
-  for (const legacy of [true, false]) {
+  for (const { label, legacy, modern } of [
+    { label: 'v3.33–v3.36 prefixed', legacy: true, modern: false },
+    { label: 'v3.37+ semantic with UI 0.8 tokens', legacy: false, modern: false },
+    { label: 'v3.43 semantic with UI 0.9 materials', legacy: false, modern: true },
+  ]) {
     await hostPage.goto(productionOrigin)
     await hostPage.getByText('暂无账号', { exact: true }).waitFor()
     assert.equal(await hostPage.locator('meta[name="codex-proxy-ui-theme-prefix"]').getAttribute('content'), 'cp')
     assert.equal(await hostPage.locator('.preview, [data-z-runtime-theme]').count(), 0)
     for (const scheme of ['light', 'dark']) {
-      const theme = createTheme({ scheme })
+      const theme = createTheme({ scheme, preset: modern ? 'soft' : 'default' })
+      if (!modern) for (const token of ['card-bg-image', 'popover-shadow', 'menu-item-selected-bg-image', 'menu-item-selected-shadow', 'layout-sider-bg-image', 'layout-sider-border-radius']) delete theme.tokens[token]
       theme.tokens['color-bg-container'] = scheme === 'dark' ? 'rgb(29, 36, 44)' : 'rgb(247, 248, 249)'
       theme.tokens['card-bg'] = theme.tokens['color-bg-container']
       theme.tokens['color-text'] = scheme === 'dark' ? 'rgb(230, 231, 232)' : 'rgb(35, 36, 37)'
@@ -221,8 +226,26 @@ try {
       assert.equal(await hostPage.locator('html').getAttribute('data-theme'), scheme)
       assert.equal(await hostPage.locator('.quota-manager').evaluate(element => getComputedStyle(element).color), theme.tokens['color-text'])
       for (const selector of ['.work-area', '.metric']) assert.equal(await hostPage.locator(selector).first().evaluate(element => getComputedStyle(element).backgroundColor), theme.tokens['color-bg-container'])
+      const cardImage = await hostPage.locator('.metric').first().evaluate(element => getComputedStyle(element).backgroundImage)
+      assert.equal(cardImage.includes('linear-gradient'), modern)
+      await hostPage.getByRole('combobox', { name: '账号状态筛选', exact: true }).click()
+      const overlay = hostPage.locator('[data-z-overlay]:visible')
+      await overlay.waitFor()
+      const shadow = await overlay.evaluate((element, modern) => {
+        const reference = document.createElement('div')
+        reference.style.boxShadow = `var(--cp-${modern ? 'popover-shadow' : 'box-shadow'})`
+        document.body.append(reference)
+        const expected = getComputedStyle(reference).boxShadow
+        reference.remove()
+        return { actual: getComputedStyle(element).boxShadow, expected }
+      }, modern)
+      assert.notEqual(shadow.actual, 'none', 'Old hosts must retain a visible overlay shadow')
+      assert.ok(shadow.actual.endsWith(shadow.expected), 'Overlay must use the host shadow after Tailwind transparent layers')
+      await hostPage.keyboard.press('Escape')
+      await overlay.waitFor({ state: 'hidden' })
+      if (modern && scheme === 'dark') await hostPage.screenshot({ path: `${artifacts}/host-soft-dark.png`, fullPage: true })
     }
-    check(`Production UI follows ${legacy ? 'v3.33–v3.36 prefixed' : 'v3.37 semantic'} host tokens and theme changes without local theme defaults`)
+    check(`Production UI follows ${label} host tokens, overlay shadows and theme changes without local theme defaults`)
   }
   assert.deepEqual(errors, [])
   assert.deepEqual(externalRequests, [])

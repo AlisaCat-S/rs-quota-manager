@@ -17,7 +17,7 @@ concurrency:
 
 env:
   RUST_VERSION: 1.99.1
-  SDK_REV: 12c32fcdecb29da4e44a21bb33fbbf2aaf6a166d
+  SDK_REV: 402bc37fbb5c83378cc83cec89e9fa251e4a99c1
   CARGO_TERM_COLOR: always
 
 defaults:
@@ -161,11 +161,12 @@ jobs:
           sha256sum --check checksums.txt
           cat > release-notes.md <<'EOF'
           Linux x86_64 与 ARM64（aarch64）安装包，glibc >= 2.28。
-          源码基线：v0.3.4；对应宿主：RS v3.39.1。
-          宿主兼容范围：>=3.33.0, <3.40.0；SDK 与打包工具固定到 v3.39.1 提交 12c32fcdecb29da4e44a21bb33fbbf2aaf6a166d。
+          源码基线：v0.3.5；对应宿主：RS v3.43.0。
+          宿主兼容范围：>=3.33.0, <3.44.0；SDK 与打包工具固定到 v3.43.0 提交 402bc37fbb5c83378cc83cec89e9fa251e4a99c1。
           插件进程仍使用 RPC v7；management v2、maintenance v1、页面桥 v2 不变，保留 RS v3.33.x 兼容。
-          UI 保持最新稳定版 v0.8.0，使用公开 themePrefix 配置兼容新旧主题桥，保留 RS v3.33–v3.38 用户的主题与使用条件。
-          SDK 新增运行设置字段 max_retry_after_seconds；本插件不读写宿主运行设置或实例 secrets，不新增配置或权限要求。
+          UI 同步至最新稳定版 v0.9.0，保留 themePrefix 与旧宿主浮层阴影，支持新版宿主注入柔光材质。
+          SDK 拆分排队超时并新增用量批量读取；本插件不读写宿主运行设置、不调用新用量接口或实例 secrets，不新增配置或权限要求。
+          新增的额度点数自动使用与本插件重置卡策略独立；不读取或修改宿主额度点数开关。
           CPR Link v2 与插件 RPC v7 是不同协议；互联 API Key 的命名预算、池内额度及缺失观测不触发 OAuth 重置卡消费。
           宿主会阻止不兼容插件自动启动；请安装此次扩大宿主范围的新包，不依赖一次性风险确认。
           受管推理 HTTP 429 的有限重放不适用于重置卡管理请求；消费失败仍保留原卡与原 UUID，等待显式确认。
