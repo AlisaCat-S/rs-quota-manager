@@ -38,7 +38,7 @@ try {
   assert.doesNotMatch(await page.locator('.forecast-cell').allTextContents().then(values => values.join(' ')), /Token|5小时|暂不支持/)
   check('Weekly monetary estimate sits between usage and reset time without five-hour or token output')
   await page.screenshot({ path: `${artifacts}/desktop.png`, fullPage: true })
-  check('UI 0.9.0 retains Chinese pagination, default 10 rows and non-Free account count')
+  check('UI 0.9.1 retains Chinese pagination, default 10 rows and non-Free account count')
 
   const firstEmail = await page.locator('.account-name').first().textContent()
   await page.getByRole('button', { name: '下一页', exact: true }).click()
@@ -210,7 +210,7 @@ try {
   for (const { label, legacy, modern } of [
     { label: 'v3.33–v3.36 prefixed', legacy: true, modern: false },
     { label: 'v3.37+ semantic with UI 0.8 tokens', legacy: false, modern: false },
-    { label: 'v3.43 semantic with UI 0.9 materials', legacy: false, modern: true },
+    { label: 'v3.43+ semantic with UI 0.9.1 materials', legacy: false, modern: true },
   ]) {
     await hostPage.goto(productionOrigin)
     await hostPage.getByText('暂无账号', { exact: true }).waitFor()
@@ -247,6 +247,29 @@ try {
     }
     check(`Production UI follows ${label} host tokens, overlay shadows and theme changes without local theme defaults`)
   }
+  for (const scheme of ['light', 'dark']) {
+    for (const customization of [{}, { seed: { borderRadius: 11, fontSize: 15, controlHeight: 36 }, component: { cardBorderRadius: 22 } }]) {
+      const plain = createTheme({ scheme, preset: 'default', customization })
+      const soft = createTheme({ scheme, preset: 'soft', customization })
+      for (const token of ['border-radius', 'card-border-radius', 'layout-sider-border-radius', 'font-size', 'control-height', 'table-row-height']) assert.equal(soft.tokens[token], plain.tokens[token], token)
+      assert.equal(soft.tokens['border-radius'], customization.seed ? '11px' : '8px')
+      assert.equal(soft.tokens['card-border-radius'], customization.component ? '22px' : '18px')
+      assert.notEqual(soft.tokens['card-bg-image'], plain.tokens['card-bg-image'])
+      const rendered = []
+      for (const theme of [plain, soft]) {
+        await hostPage.evaluate(theme => window.testHostTheme(false, theme), theme)
+        rendered.push(await hostPage.locator('.metric').first().evaluate(element => {
+          const style = getComputedStyle(element)
+          return { radius: style.borderRadius, fontSize: style.fontSize, height: element.getBoundingClientRect().height }
+        }))
+      }
+      assert.deepEqual(rendered[1], rendered[0], 'Changing material must preserve rendered card dimensions')
+      assert.equal(rendered[1].radius, soft.tokens['card-border-radius'])
+      assert.equal(rendered[1].fontSize, soft.tokens['font-size'])
+    }
+  }
+  await hostPage.screenshot({ path: `${artifacts}/host-custom-soft-dark.png`, fullPage: true })
+  check('Default and soft materials preserve default and customized dimensions in light and dark production pages')
   assert.deepEqual(errors, [])
   assert.deepEqual(externalRequests, [])
   console.log(JSON.stringify({ passed: passed.length, tests: passed, productionRequests: 0, artifacts }, null, 2))

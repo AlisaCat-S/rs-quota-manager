@@ -262,6 +262,37 @@ mod tests {
     }
 
     #[test]
+    fn image_quota_cannot_trigger_weekly_redemption_or_confirm_recovery() {
+        let now = 2000;
+        let image = quota("imagegen_premium:604800s", 604800, 100.0, 1001, 200000);
+        assert!(account_weekly(&image).is_none());
+        assert!(!exhausted(&image, now));
+
+        let mut mixed = quota("codex:604800s", 604800, 25.0, 1001, 200000);
+        mixed.windows.extend(image.windows);
+        assert!(!exhausted(&mixed, now));
+        mixed.windows[0].used_percent = Some(100.0);
+        mixed.windows[1].used_percent = Some(0.0);
+        assert!(exhausted(&mixed, now));
+
+        let mut state = AccountState {
+            awaiting_recovery: true,
+            last_attempt_at_ms: Some(1000),
+            ..Default::default()
+        };
+        state.note_recovery(&mixed);
+        assert!(state.awaiting_recovery);
+        mixed.windows.remove(0);
+        state.note_recovery(&mixed);
+        assert!(state.awaiting_recovery);
+        mixed
+            .windows
+            .extend(quota("codex:604800s", 604800, 25.0, 1001, 200000).windows);
+        state.note_recovery(&mixed);
+        assert!(!state.awaiting_recovery);
+    }
+
+    #[test]
     fn picks_earliest_unexpired_weekly_card() {
         let card = |id: &str, expiry: &str, title: &str, status: &str| Card {
             id: id.into(),
